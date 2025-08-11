@@ -1,21 +1,15 @@
 import React from 'react';
+import TitrationGame from './TitrationGame';
 
 /**
- * Root component for the SiU Lab titration simulator.
- *
- * This skeleton provides a minimal application that renders a heading and
- * placeholder text.  You can replace the contents of the return block
- * with the real titration game once you have the game logic ready.
+ * Root component for SiU Lab.  This file now simply renders the
+ * TitrationGame component, which contains the complete titration
+ * simulation.  Styles are applied globally in index.css.
  */
 export default function App() {
   return (
-    <div style={{ fontFamily: 'sans-serif', padding: '2rem' }}>
-      <h1>SiU Lab Titrering</h1>
-      <p>
-        Denne applikasjonen er under utvikling. Her skal det ligge et fullt
-        fungerende titrerspill med animasjoner og kjemiske beregninger. Bytt
-        gjerne ut dette innholdet med den faktiske koden når den er klar.
-      </p>
+    <div style={{ fontFamily: 'sans-serif' }}>
+      <TitrationGame />
     </div>
   );
 }
