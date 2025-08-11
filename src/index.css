@@ -3,5 +3,164 @@
  */
 body {
   margin: 0;
-  background-color: #f7f7f7;
+  /* Use a calm pastel gradient for the page background.  Gradients
+     create depth and draw attention without overwhelming the viewer.
+     Colours are chosen from a cool analogous palette for harmony. */
+  background: linear-gradient(180deg, #e2ecff 0%, #f9fbff 100%);
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
+  color: #333;
+}
+
+/* Outer wrapper that limits width and centers the content.  It also
+   provides some vertical padding. */
+.titration-container {
+  padding: 2rem 1rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Dashboard layout: arrange main panels horizontally on wide screens
+   and stack on narrow screens. */
+.game-dashboard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+/* Common panel styling for cards used throughout the dashboard.  Use
+   subtle shadows and rounded corners to create depth without heavy
+   borders. */
+.panel {
+  background: #ffffffdd;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 1.2rem;
+  flex: 1 1 280px;
+  min-width: 260px;
+}
+
+/* Header styling for the dashboard.  A gradient bar sets the mood
+   while crisp typography ensures clarity. */
+.dashboard-header {
+  background: linear-gradient(90deg, #7b7ce2 0%, #61a2e8 100%);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+}
+.dashboard-header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  letter-spacing: 0.5px;
+}
+.dashboard-header p {
+  margin: 0.4rem 0 0;
+  font-size: 1rem;
+  opacity: 0.9;
+}
+
+/* Specific panel sizes can override the generic panel for more
+   control. */
+.controls-panel {
+  flex: 1 1 280px;
+}
+
+/* The display panel holds the lab illustration and graph.  On wide
+   screens it grows to occupy more space. */
+.display-panel {
+  flex: 2 1 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Nested panels inside the display panel use the same card styling. */
+.lab-view,
+.graph-view {
+  background: #ffffffef;
+  border-radius: 10px;
+  padding: 0.8rem;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Grouping for labels and inputs in the control panel. */
+.control-group {
+  margin-bottom: 0.6rem;
+  display: flex;
+  flex-direction: column;
+}
+.control-group label {
+  font-size: 0.9rem;
+  margin-bottom: 0.2rem;
+}
+.control-group input,
+.control-group select {
+  font-size: 0.9rem;
+  padding: 0.4rem;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+  background: #f9f9ff;
+}
+.control-group button {
+  font-size: 0.9rem;
+  padding: 0.45rem 0.8rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 0.4rem;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+/* Primary buttons use a gradient to draw attention. */
+.button-primary {
+  background-image: linear-gradient(90deg, #7b7ce2 0%, #61a2e8 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+.button-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
+}
+/* Secondary buttons have a subtler gradient and lower contrast. */
+.button-secondary {
+  background-image: linear-gradient(90deg, #e0e2ff 0%, #c8d6ff 100%);
+  color: #4c5c8a;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+.button-secondary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.12);
+}
+.button-secondary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Info panels share the panel styling; we add margin on top */
+.info-panel {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+/* Graph labels below the SVG. */
+.graph-labels {
+  display: flex;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+/* Animation for swirling inside the flask. */
+@keyframes swirl {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
