@@ -1,0 +1,7 @@
+/* Global CSS for the SiU Lab titration simulator.  Keep this minimal
+ * and override with component-level styles as your app grows.
+ */
+body {
+  margin: 0;
+  background-color: #f7f7f7;
+}
