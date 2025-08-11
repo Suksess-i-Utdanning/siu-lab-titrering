@@ -398,6 +398,64 @@ export default function TitrationGame() {
         .hint { color: #7D3C98; font-size: 12px; }
         .message { margin-top: 8px; font-weight: bold; color: #1ABC9C; }
         @keyframes drip { 0% { opacity: 0; transform: translateY(0); } 50% { opacity: 1; transform: translateY(10px); } 100% { opacity: 0; transform: translateY(20px); } }
+          /* Design improvements - pastel colours and improved layout */
+  .titration-game {
+    background: linear-gradient(180deg, #F5F9FF 0%, #F1F5FF 100%);
+    color: #2d2d3a;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .title {
+    color: #3e3275;
+    font-size: 1.4em;
+    margin-bottom: 16px;
+  }
+  .controls {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .select-row,
+  .input-row,
+  .button-row {
+    gap: 16px;
+  }
+  label {
+    color: #343a6e;
+    font-size: 0.9em;
+  }
+  select,
+  input {
+    border: 1px solid #bcbcf2;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 14px;
+  }
+  button {
+    background-color: #7058a5;
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 16px;
+    transition: background-color 0.2s ease;
+  }
+  button:hover {
+    background-color: #614a8f;
+  }
+  .lab-view, .graph-view, .info-panel {
+    background: #f8f6ff;
+    border-radius: 12px;
+    border: 1px solid #e0ddf7;
+  }
+  .hint {
+    color: #8050a0;
+    font-size: 12px;
+  }
+  .message {
+    color: #49406f;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+
       `}</style>
     </div>
   );
