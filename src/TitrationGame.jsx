@@ -113,6 +113,71 @@ const examTasks = [
     hint: 'Et av de 12 prinsippene oppfordrer til å bruke biologiske eller andre fornybare ressurser.',
     explanation: 'Prinsippet «Fornybare råstoffer» fremhever bruken av ikke-fossile, fornybare kilder i kjemisk produksjon.'
   }
+  ,
+  {
+    question: 'Hva skjer med likevekten til en eksoterm reaksjon når temperaturen økes?',
+    type: 'mcq',
+    options: ['Forskyves mot produkter', 'Forskyves mot reaktanter', 'Den påvirkes ikke', 'Reaksjonen stopper'],
+    answer: 'Forskyves mot reaktanter',
+    hint: 'Le Chateliers prinsipp: varme er et produkt i eksoterme reaksjoner.',
+    explanation: 'Når temperaturen økes i en eksoterm reaksjon, opptrer varme som et produkt. Økt temperatur favoriserer den motsatte, endotermiske retningen, slik at likevekten forskyves mot reaktanter.'
+  },
+  {
+    question: 'Hvilket tegn har ΔG for en spontan prosess under standardbetingelser?',
+    type: 'mcq',
+    options: ['Positiv', 'Null', 'Negativ', 'Kan ikke bestemmes'],
+    answer: 'Negativ',
+    hint: 'Spontane prosesser frigjør fri energi.',
+    explanation: 'For spontane prosesser er den Gibbs frie energiendringen (ΔG) negativ under standardbetingelser.'
+  },
+  {
+    question: 'Hvor mye energi frigjøres når 2 mol butan (ΔH = −2877 kJ/mol) brenner fullstendig?',
+    type: 'numeric',
+    answer: 5754,
+    tolerance: 10,
+    hint: 'Multipliser reaksjonsentalpien med antall mol.',
+    explanation: 'Forbrenning av butan frigjør −2877 kJ per mol. For 2 mol frigjøres 2 × 2877 kJ = 5754 kJ.'
+  },
+  {
+    question: 'Hvilken av følgende er en oksidasjonsreaksjon?',
+    type: 'mcq',
+    options: ['Fe²⁺ → Fe³⁺ + e⁻', 'Cl₂ + 2 e⁻ → 2 Cl⁻', 'Cu²⁺ + 2 e⁻ → Cu', 'Ag⁺ + e⁻ → Ag'],
+    answer: 'Fe²⁺ → Fe³⁺ + e⁻',
+    hint: 'Oksidasjon innebærer tap av elektroner.',
+    explanation: 'Fe²⁺ mister et elektron for å danne Fe³⁺. Det er en oksidasjon; de andre er reduksjoner.'
+  },
+  {
+    question: 'Hvor mange gram NaCl trengs for å lage 250 mL av en 0,20 M løsning? (Molmasse NaCl = 58,44 g/mol)',
+    type: 'numeric',
+    answer: 2.93,
+    tolerance: 0.1,
+    hint: 'Bruk formelen m = c × V × M.',
+    explanation: 'm = 0,20 mol/L × 0,250 L × 58,44 g/mol = 2,93 g.'
+  },
+  {
+    question: 'Hvilken kromatografiteknikk er best egnet for varmefølsomme forbindelser?',
+    type: 'mcq',
+    options: ['Gasskromatografi', 'Tynnsjiktskromatografi (TLC)', 'HPLC', 'Papirkromatografi'],
+    answer: 'HPLC',
+    hint: 'HPLC kan utføres ved romtemperatur og med høy oppløsning.',
+    explanation: 'HPLC (high‑performance liquid chromatography) bruker et trykksatt system og kan separere varmefølsomme stoffer uten oppvarming, til forskjell fra gasskromatografi.'
+  },
+  {
+    question: 'Hva er den generelle formelen for alkaner?',
+    type: 'mcq',
+    options: ['CₙH₂ₙ', 'CₙH₂ₙ₊₂', 'CₙH₂ₙ₋₂', 'CₙHₙ'],
+    answer: 'CₙH₂ₙ₊₂',
+    hint: 'Metan, etan, propan følger dette mønsteret.',
+    explanation: 'Alkaner er mettede hydrokarboner med formel CₙH₂ₙ₊₂.'
+  },
+  {
+    question: 'Hvilken type polymerisering brukes for å fremstille nylon‑6,6?',
+    type: 'mcq',
+    options: ['Addisjonspolymerisering', 'Kondensasjonspolymerisering', 'Radikalpolymerisering', 'Koordinasjonspolymerisering'],
+    answer: 'Kondensasjonspolymerisering',
+    hint: 'Nylon‑6,6 dannes fra en diamin og en dikarboksylsyre med eliminasjon av små molekyler.',
+    explanation: 'Nylon‑6,6 dannes via kondensasjonspolymerisering av heksametylendiamin og adipinsyre, der vann elimineres ved hver kobling.'
+  },
 ];
 
 // Compute the pH for a given titration state.  The function
@@ -243,6 +308,9 @@ export default function TitrationGame() {
   const [view, setView] = useState('titration');
   // Index of the current exam task
   const [taskIndex, setTaskIndex] = useState(0);
+  // Array of exam tasks in the order presented.  This state allows shuffling
+  // tasks at the start of each exam so students get a varied experience.
+  const [tasks, setTasks] = useState(examTasks);
   // User's current answer (string to accommodate numeric and MCQ)
   const [userAnswer, setUserAnswer] = useState('');
   // Number of correct answers given
@@ -353,6 +421,9 @@ export default function TitrationGame() {
 
   // Begin an exam: reset all exam‑related state and navigate to exam view
   function startExam() {
+    // Shuffle tasks for a fresh exam and reset state
+    const shuffled = [...examTasks].sort(() => Math.random() - 0.5);
+    setTasks(shuffled);
     setView('exam');
     setTaskIndex(0);
     setUserAnswer('');
@@ -364,7 +435,7 @@ export default function TitrationGame() {
 
   // Submit the current answer and advance to next question or finish the exam
   function submitAnswer() {
-    const task = examTasks[taskIndex];
+    const task = tasks[taskIndex];
     let correct = false;
     if (task.type === 'numeric') {
       const value = parseFloat(userAnswer);
@@ -377,7 +448,7 @@ export default function TitrationGame() {
     if (correct) {
       setExamScore(prev => prev + 1);
     }
-    if (taskIndex < examTasks.length - 1) {
+    if (taskIndex < tasks.length - 1) {
       setTaskIndex(prev => prev + 1);
       setUserAnswer('');
       setShowHint(false);
@@ -532,12 +603,12 @@ export default function TitrationGame() {
       {view === 'exam' && (
         <div className="exam-panel">
           <h2>Eksamen</h2>
-          <p><strong>Oppgave {taskIndex + 1} av {examTasks.length}</strong></p>
-          <p>{examTasks[taskIndex].question}</p>
-          {examTasks[taskIndex].type === 'numeric' ? (
+          <p><strong>Oppgave {taskIndex + 1} av {tasks.length}</strong></p>
+          <p>{tasks[taskIndex].question}</p>
+          {tasks[taskIndex].type === 'numeric' ? (
             <input type="number" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} />
           ) : (
-            examTasks[taskIndex].options.map(opt => (
+            tasks[taskIndex].options.map(opt => (
               <label key={opt} style={{ display: 'block', margin: '4px 0' }}>
                 <input type="radio" name="mcq" value={opt} checked={userAnswer === opt} onChange={e => setUserAnswer(e.target.value)} />
                 {opt}
@@ -548,16 +619,16 @@ export default function TitrationGame() {
             <button onClick={toggleHint}>{showHint ? 'Skjul hint' : 'Vis hint'}</button>
             <button onClick={submitAnswer}>{taskIndex === examTasks.length - 1 ? 'Fullfør' : 'Neste'}</button>
           </div>
-          {showHint && <p className="hint">{examTasks[taskIndex].hint}</p>}
+          {showHint && <p className="hint">{tasks[taskIndex].hint}</p>}
         </div>
       )}
       {/* Results view */}
       {view === 'results' && (
         <div className="results-panel">
           <h2>Resultater</h2>
-          <p>Du svarte riktig på {examScore} av {examTasks.length} oppgaver.</p>
+          <p>Du svarte riktig på {examScore} av {tasks.length} oppgaver.</p>
           <ul>
-            {examTasks.map((task, i) => (
+            {tasks.map((task, i) => (
               <li key={i} style={{ marginBottom: '8px' }}>
                 <strong>Oppgave {i + 1}:</strong> {task.question}<br />
                 Riktig svar: {task.answer}. {task.explanation}
