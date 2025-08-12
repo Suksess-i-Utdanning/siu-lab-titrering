@@ -603,6 +603,10 @@ export default function TitrationGame() {
       {view === 'exam' && (
         <div className="exam-panel">
           <h2>Eksamen</h2>
+          {/* Progress bar showing completed fraction of exam */}
+          <div className="progress">
+            <div className="progress-inner" style={{ width: `${(taskIndex) / tasks.length * 100}%` }}></div>
+          </div>
           <p><strong>Oppgave {taskIndex + 1} av {tasks.length}</strong></p>
           <p>{tasks[taskIndex].question}</p>
           {tasks[taskIndex].type === 'numeric' ? (
@@ -786,6 +790,20 @@ export default function TitrationGame() {
         .results-panel ul {
           list-style: none;
           padding-left: 0;
+        }
+        /* Progress bar for exam questions */
+        .progress {
+          height: 6px;
+          background: #E5EAF1;
+          border-radius: 3px;
+          margin-bottom: 12px;
+          overflow: hidden;
+        }
+        .progress-inner {
+          height: 6px;
+          background: linear-gradient(90deg, #74B9FF 0%, #0984E3 100%);
+          border-radius: 3px;
+          transition: width 0.3s ease;
         }
         /* Drip animation for titrant drops */
         @keyframes drip {
