@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
 // ---------------------------------------------------------------
-// TitrationGameStep2
+// TitrationGameStep4
 //
-// This component implements Step 2 of the SiU Lab titration project.  It
-// combines the improved laboratory illustration from Step 1 with a new
-// titration‑based exam engine.  Students must perform complete
-// acid–base titrations by selecting the correct reagents and volumes and
-// reading the equivalence point off the curve.  Each task has hints and
-// solutions, and the engine tracks progress through multiple tasks with
-// navigation controls.
+// This component implements Step 4 of the SiU Lab titration project.
+// It builds on the previous steps by enhancing the user interface with a
+// more spacious layout, pastel gradient backgrounds and polished card
+// styling.  The laboratory illustration and exam engine are preserved,
+// but the design aims for a magical, inviting feel that aligns with SiU
+// Skole aesthetics.
 
 // Acid/base/indicator definitions (monoprotic assumption).  Colours are
 // for display only.
@@ -761,7 +760,7 @@ export default function TitrationGame() {
       <div className="panel" style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: '1rem', alignItems: 'start' }}>
         {/* Lab illustration */}
         <div className="lab-view">
-          <svg width="200" height="260" viewBox="0 0 700 320">
+        <svg width="260" height="320" viewBox="0 0 700 320">
             <defs>
               <linearGradient id="glassGrad" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
@@ -975,12 +974,14 @@ export default function TitrationGame() {
   );
 
   return (
-    <div className="container" style={{ maxWidth: '900px', margin: '0 auto', padding: '1rem' }}>
-      <h1 style={{ textAlign: 'center', marginBottom: '1rem' }}>SiU Lab – Magisk KjemiLab</h1>
-      {view === 'home' && <HomeView />}
-      {view === 'titration' && <TitrationView />}
-      {view === 'exam' && <ExamView />}
-      {view === 'results' && <ResultsView />}
+    <div style={{ minHeight: '100vh', background: 'radial-gradient(circle at 50% 20%, #f7faff, #e6f0ff)', padding: '2rem' }}>
+      <div className="container" style={{ maxWidth: '1000px', margin: '0 auto', background: 'rgba(255,255,255,0.85)', padding: '2rem', borderRadius: '14px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+        <h1 style={{ textAlign: 'center', marginBottom: '1.5rem', fontSize: '2rem', color: '#1c2e8c' }}>SiU Lab – Magisk KjemiLab</h1>
+        {view === 'home' && <HomeView />}
+        {view === 'titration' && <TitrationView />}
+        {view === 'exam' && <ExamView />}
+        {view === 'results' && <ResultsView />}
+      </div>
     </div>
   );
 }
