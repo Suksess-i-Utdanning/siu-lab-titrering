@@ -420,18 +420,21 @@ function TitrationPanel({ params, evaluate }) {
 
   // Evaluate the titration configuration when requested. Returns feedback
   // string and whether the answer is correct according to params.
+  // Local feedback message for titration evaluation
+  const [feedbackMsg, setFeedbackMsg] = useState('');
   function check() {
-    let feedback = [];
+    let msgs = [];
     let correct = true;
-    if (acidKey !== acidInit) { feedback.push('Feil syre'); correct = false; }
-    if (baseKey !== baseInit) { feedback.push('Feil base'); correct = false; }
-    if (Math.abs(Ca - CaInit) > 0.001) { feedback.push('Feil Ca'); correct = false; }
-    if (Math.abs(Cb - CbInit) > 0.001) { feedback.push('Feil Cb'); correct = false; }
-    if (Math.abs(Va - VaInit) > 1e-5) { feedback.push('Feil Va'); correct = false; }
-    if (Math.abs(Vb - expectedVolume) > 0.0005) { feedback.push('Feil Vb ved ekvivalens'); correct = false; }
-    if (indicatorKey !== indicatorInit) { feedback.push('Feil indikator'); correct = false; }
-    if (correct) feedback.push('Alt korrekt!');
-    return { correct, feedback: feedback.join('. ') };
+    if (acidKey !== acidInit) { msgs.push('Feil syre'); correct = false; }
+    if (baseKey !== baseInit) { msgs.push('Feil base'); correct = false; }
+    if (Math.abs(Ca - CaInit) > 0.001) { msgs.push('Feil Ca'); correct = false; }
+    if (Math.abs(Cb - CbInit) > 0.001) { msgs.push('Feil Cb'); correct = false; }
+    if (Math.abs(Va - VaInit) > 1e-5) { msgs.push('Feil Va'); correct = false; }
+    if (Math.abs(Vb - expectedVolume) > 0.0005) { msgs.push('Feil Vb ved ekvivalens'); correct = false; }
+    if (indicatorKey !== indicatorInit) { msgs.push('Feil indikator'); correct = false; }
+    if (correct) msgs.push('Alt korrekt!');
+    setFeedbackMsg(msgs.join('. '));
+    return { correct, feedback: msgs.join('. ') };
   }
 
   return (
@@ -473,11 +476,11 @@ function TitrationPanel({ params, evaluate }) {
           <button className="button-secondary" onClick={reset}>Nullstill</button>
           <button className="button-primary" onClick={() => {
             const res = check();
-            alert(res.feedback);
             evaluate(res.correct);
           }}>Kontroller</button>
         </div>
         <p style={{ marginTop: '0.4rem' }}>pH: {pH.toFixed(2)} – Ekvivalens ved V_b = {equivalence === Infinity ? '-' : equivalence.toFixed(3)} L</p>
+        {feedbackMsg && <p style={{ marginTop: '0.3rem', fontSize: '13px', color: feedbackMsg.startsWith('Alt') ? '#2a925a' : '#b04848' }}>{feedbackMsg}</p>}
       </div>
       <div className="panel" style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: '1rem' }}>
         <div>
@@ -615,31 +618,50 @@ function PrecipitationPanel({ params, evaluate }) {
   const [vol1, setVol1] = useState(0.05);
   const [vol2, setVol2] = useState(0.05);
   const outcome = useMemo(() => getPrecipitateOutcome(salt1, salt2), [salt1, salt2]);
+  const [feedbackMsg, setFeedbackMsg] = useState('');
   function check() {
     let correct = true;
-    let feedback = [];
-    // check chosen salts (order not important)
+    let msgs = [];
     const chosen = [salt1, salt2].sort().join('+');
     const expected = [expectedSalt1, expectedSalt2].sort().join('+');
-    if (chosen !== expected) {
-      correct = false;
-      feedback.push('Feil kombinasjon av salter');
-    }
-    if (expectedColour && outcome.colour !== expectedColour) {
-      correct = false;
-      feedback.push('Feil farge på bunnfall');
-    }
-    if (expectedCategory && outcome.category !== expectedCategory) {
-      correct = false;
-      feedback.push(`Feil kategori: du valgte ${outcome.category}`);
-    }
-    if (correct) feedback.push('Riktig!');
-    alert(feedback.join('. '));
+    if (chosen !== expected) { correct = false; msgs.push('Feil kombinasjon av salter'); }
+    if (expectedColour && outcome.colour !== expectedColour) { correct = false; msgs.push('Feil farge på bunnfall'); }
+    if (expectedCategory && outcome.category !== expectedCategory) { correct = false; msgs.push(`Feil kategori: du valgte ${outcome.category}`); }
+    if (correct) msgs.push('Riktig!');
+    setFeedbackMsg(msgs.join('. '));
     evaluate(correct);
   }
   return (
     <div className="panel" style={{ marginTop: '0.8rem' }}>
       <h4>Fellepanel</h4>
+      {/* Illustration of precipitation: two tubes pouring into a beaker */}
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: '0.4rem' }}>
+        <svg width="220" height="90" viewBox="0 0 200 90">
+          <defs>
+            <linearGradient id="tube1" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#cce6ff" />
+              <stop offset="100%" stopColor="#add8e6" />
+            </linearGradient>
+            <linearGradient id="tube2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ffd6e7" />
+              <stop offset="100%" stopColor="#f4c2c2" />
+            </linearGradient>
+          </defs>
+          {/* left test tube */}
+          <path d="M20 5 v40 a10 10 0 0 0 20 0 v-40 z" fill="url(#tube1)" stroke="#94a3b8" strokeWidth="1" />
+          {/* right test tube */}
+          <path d="M160 5 v40 a10 10 0 0 1 -20 0 v-40 z" fill="url(#tube2)" stroke="#94a3b8" strokeWidth="1" />
+          {/* streams */}
+          <path d="M40 45 c0 15 20 15 30 30" stroke="#add8e6" strokeWidth="3" fill="none" strokeLinecap="round" />
+          <path d="M160 45 c0 15 -20 15 -30 30" stroke="#f4c2c2" strokeWidth="3" fill="none" strokeLinecap="round" />
+          {/* beaker */}
+          <path d="M70 65 v15 h60 v-15" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1" />
+          {/* precipitate dots */}
+          <circle cx="100" cy="72" r="3" fill="#94a3b8" />
+          <circle cx="92" cy="78" r="2" fill="#94a3b8" />
+          <circle cx="108" cy="78" r="2" fill="#94a3b8" />
+        </svg>
+      </div>
       <p>Velg to ioneløsninger (salter). Resultatet vises automatisk.</p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
         <label>Salt 1
@@ -662,6 +684,7 @@ function PrecipitationPanel({ params, evaluate }) {
       <p>Bunnfall: {outcome.product ? outcome.product : 'ingen'}</p>
       <p>Kategori: {outcome.category}</p>
       {outcome.colour && <p>Farge: {outcome.colour}</p>}
+      {feedbackMsg && <p style={{ marginTop: '0.3rem', fontSize: '13px', color: feedbackMsg.startsWith('Riktig') ? '#2a925a' : '#b04848' }}>{feedbackMsg}</p>}
       <button className="button-primary" onClick={check}>Kontroller</button>
     </div>
   );
@@ -681,30 +704,33 @@ function ElectrochemPanel({ params, subExperiment, evaluate }) {
   const [useWater, setUseWater] = useState(params.requiresWater || false);
   const [voltage, setVoltage] = useState(3.0);
 
+  const [feedbackMsg, setFeedbackMsg] = useState('');
   function check() {
     let correct = true;
-    let feedback = [];
+    let msgs = [];
     if (subExperiment === 'galvanic') {
-      if (anode !== params.correctAnode) { correct = false; feedback.push('Feil anode'); }
-      if (cathode !== params.correctCathode) { correct = false; feedback.push('Feil katode'); }
-      if (saltBridge !== params.correctSaltBridge) { correct = false; feedback.push('Feil saltbro'); }
+      if (anode !== params.correctAnode) { correct = false; msgs.push('Feil anode'); }
+      if (cathode !== params.correctCathode) { correct = false; msgs.push('Feil katode'); }
+      if (saltBridge !== params.correctSaltBridge) { correct = false; msgs.push('Feil saltbro'); }
     } else if (subExperiment === 'electrolysis') {
-      if (cathode !== params.expectedCathode) { correct = false; feedback.push('Feil katode'); }
-      if (anode !== params.expectedAnode) { correct = false; feedback.push('Feil anode'); }
-      if (useWater !== params.requiresWater) { correct = false; feedback.push(params.requiresWater ? 'Vann må være tilstede' : 'Vann skal ikke brukes'); }
+      if (cathode !== params.expectedCathode) { correct = false; msgs.push('Feil katode'); }
+      if (anode !== params.expectedAnode) { correct = false; msgs.push('Feil anode'); }
+      if (useWater !== params.requiresWater) { correct = false; msgs.push(params.requiresWater ? 'Vann må være tilstede' : 'Vann skal ikke brukes'); }
     } else if (subExperiment === 'molten') {
-      if (cathode !== params.expectedCathode) { correct = false; feedback.push('Feil katode'); }
-      if (anode !== params.expectedAnode) { correct = false; feedback.push('Feil anode'); }
-      if (useWater !== params.requiresWater) { correct = false; feedback.push('Vann må ikke tilsettes i smelte'); }
+      if (cathode !== params.expectedCathode) { correct = false; msgs.push('Feil katode'); }
+      if (anode !== params.expectedAnode) { correct = false; msgs.push('Feil anode'); }
+      if (useWater !== params.requiresWater) { correct = false; msgs.push('Vann må ikke tilsettes i smelte'); }
     }
-    if (correct) feedback.push('Riktig!');
-    alert(feedback.join('. '));
+    if (correct) msgs.push('Riktig!');
+    setFeedbackMsg(msgs.join('. '));
     evaluate(correct);
   }
 
   return (
     <div className="panel" style={{ marginTop: '0.8rem' }}>
       <h4>Elektrokjemi – {subExperiment === 'galvanic' ? 'Galvanisk celle' : subExperiment === 'electrolysis' ? 'Elektrolyse' : 'Smelte'}</h4>
+      {/* Diagram showing apparatus for each electrochemistry type */}
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>{renderDiagram()}</div>
       {/* Options vary by subExperiment */}
       {subExperiment === 'galvanic' && (
         <>
@@ -723,7 +749,7 @@ function ElectrochemPanel({ params, subExperiment, evaluate }) {
               {saltBridgeOptions.map(sb => <option key={sb} value={sb}>{sb}</option>)}
             </select>
           </label>
-          <p>Beregn E° = E°(katode) – E°(anode) = {(E0[cathode] - E0[anode]).toFixed(2)} V</p>
+          <p>Beregn E° = E°(katode) − E°(anode) = {(E0[cathode] - E0[anode]).toFixed(2)} V</p>
         </>
       )}
       {subExperiment === 'electrolysis' && (
@@ -778,6 +804,7 @@ function ElectrochemPanel({ params, subExperiment, evaluate }) {
           <p>Forventede produkter: Katode → {params.expectedProductCathode}, Anode → {params.expectedProductAnode}</p>
         </>
       )}
+      {feedbackMsg && <p style={{ marginTop: '0.4rem', fontSize: '13px', color: feedbackMsg.startsWith('Riktig') ? '#2a925a' : '#b04848' }}>{feedbackMsg}</p>}
       <button className="button-primary" onClick={check} style={{ marginTop: '0.5rem' }}>Kontroller</button>
     </div>
   );
@@ -792,14 +819,16 @@ function CalorimetryPanel({ params, evaluate }) {
   const [stirrer, setStirrer] = useState(requiresStirrer || false);
   const [m, setM] = useState(mass || 100);
   const [dT, setDT] = useState(deltaT || 5);
+  // Local feedback message for calorimetry evaluation
+  const [feedbackMsg, setFeedbackMsg] = useState('');
   function check() {
     let correct = true;
-    let feedback = [];
-    if (calorimeter !== correctCalorimeter) { correct = false; feedback.push('Feil kalorimeter'); }
-    if (thermometer !== requiresThermometer) { correct = false; feedback.push(requiresThermometer ? 'Termometer må være med' : 'Termometer skal ikke brukes'); }
-    if ((requiresStirrer || false) !== stirrer) { correct = false; feedback.push(requiresStirrer ? 'Omrører må være med' : 'Omrører skal ikke brukes'); }
-    if (correct) feedback.push('Riktig!');
-    alert(feedback.join('. '));
+    const msgs = [];
+    if (calorimeter !== correctCalorimeter) { correct = false; msgs.push('Feil kalorimeter'); }
+    if (thermometer !== requiresThermometer) { correct = false; msgs.push(requiresThermometer ? 'Termometer må være med' : 'Termometer skal ikke brukes'); }
+    if ((requiresStirrer || false) !== stirrer) { correct = false; msgs.push(requiresStirrer ? 'Omrører må være med' : 'Omrører skal ikke brukes'); }
+    if (correct) msgs.push('Riktig!');
+    setFeedbackMsg(msgs.join('. '));
     evaluate(correct);
   }
   // compute heat
@@ -812,6 +841,33 @@ function CalorimetryPanel({ params, evaluate }) {
   return (
     <div className="panel" style={{ marginTop: '0.8rem' }}>
       <h4>Kalorimetri</h4>
+      {/* Simple illustration of a calorimeter: nested cups, lid, thermometer and stirrer */}
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: '0.4rem' }}>
+        <svg width="180" height="80" viewBox="0 0 180 80">
+          <defs>
+            <linearGradient id="caloOuter" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#e8eefc" />
+              <stop offset="100%" stopColor="#d1d9ec" />
+            </linearGradient>
+            <linearGradient id="caloInner" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#bcd7f6" />
+              <stop offset="100%" stopColor="#8bb7e2" />
+            </linearGradient>
+          </defs>
+          {/* outer cup */}
+          <rect x="30" y="20" width="120" height="50" rx="8" fill="url(#caloOuter)" stroke="#94a3b8" />
+          {/* inner cup */}
+          <rect x="50" y="30" width="80" height="40" rx="6" fill="url(#caloInner)" stroke="#94a3b8" />
+          {/* lid */}
+          <rect x="40" y="15" width="100" height="8" rx="4" fill="#a3b8d8" />
+          {/* thermometer */}
+          <line x1="90" y1="10" x2="90" y2="40" stroke="#c75d5d" strokeWidth="2" />
+          <circle cx="90" cy="10" r="5" fill="#c75d5d" />
+          {/* stirrer */}
+          <line x1="100" y1="10" x2="100" y2="35" stroke="#6b7280" strokeWidth="2" />
+          <circle cx="100" cy="10" r="4" fill="#6b7280" />
+        </svg>
+      </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
         <label>Kalorimeter
           <select value={calorimeter} onChange={e => setCalorimeter(e.target.value)}>
@@ -832,6 +888,7 @@ function CalorimetryPanel({ params, evaluate }) {
         </label>
       </div>
       <p>q = {heat_kJ.toFixed(2)} kJ</p>
+      {feedbackMsg && <p style={{ marginTop: '0.4rem', fontSize: '13px', color: feedbackMsg.startsWith('Riktig') ? '#2a925a' : '#b04848' }}>{feedbackMsg}</p>}
       <button className="button-primary" onClick={check}>Kontroller</button>
     </div>
   );
@@ -974,7 +1031,7 @@ export default function TitrationGame() {
           <button className="button-secondary" onClick={randomTask}>Tilfeldig</button>
           <button className="button-secondary" onClick={() => setShowHint(prev => !prev)}>{showHint ? 'Skjul hint' : 'Hint'}</button>
           <button className="button-secondary" onClick={() => setShowSolution(prev => !prev)}>{showSolution ? 'Skjul fasit' : 'Fasit'}</button>
-          <button className="button-secondary" onClick={resetExam}>Tilbake</button>
+          <button className="button-secondary" onClick={resetExam}>Til eksperimentvalg</button>
         </div>
         <p style={{ marginTop: '0.5rem' }}>Poeng: {examScore}</p>
         {/* Show interactive panels based on experiment and subExperiment */}
