@@ -880,14 +880,16 @@ export default function TitrationGame() {
               <table><thead><tr><th>Dato</th><th>Riktige</th><th>Totalt</th></tr></thead><tbody>{scoreHistory.map((row, idx) => (<tr key={idx}><td>{row.date}</td><td>{row.score}</td><td>{row.total}</td></tr>))}</tbody></table>
             </div>
             <h3>Forklaringer</h3>
-            <ol style={{ paddingLeft:'16px' }}>{tasks.map((task,i) => (
-              <li key={i} style={{ marginBottom:'8px' }}>
-                <strong>{task.question.split('
-')[0]}</strong><br />
-                <em>Riktig svar:</em> {typeof task.answer === 'number' ? task.answer : task.answer.toString()}<br />
-                <em>Forklaring:</em> {task.explanation}
-              </li>
-            ))}</ol>
+            <ol style={{ paddingLeft:'16px' }}>{tasks.map((task,i) => {
+              const firstLine = task.question.split('\n')[0];
+              return (
+                <li key={i} style={{ marginBottom:'8px' }}>
+                  <strong>{firstLine}</strong><br />
+                  <em>Riktig svar:</em> {typeof task.answer === 'number' ? task.answer : task.answer.toString()}<br />
+                  <em>Forklaring:</em> {task.explanation}
+                </li>
+              );
+            })}</ol>
             <div style={{ display:'flex', gap:'8px', marginTop:'8px' }}>
               <button className="primary" onClick={startExam}>Prøv igjen</button>
               <button className="secondary" onClick={goToSimulation}>Tilbake til titrering</button>
