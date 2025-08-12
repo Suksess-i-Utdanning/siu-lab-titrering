@@ -1,27 +1,43 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
-// -----------------------------------------------------------------------------
-// TitrationGameStep5
-//
-// This component implements Step 5 of the SiU Lab titration project.  It
-// restructures the exam engine to focus on practical laboratory experiments
-// required in the Norwegian Kjemi 2 course.  Each exam task is accompanied
-// by an interactive laboratory panel that lets the student simulate the
-// experiment and observe key variables such as concentrations, volumes,
-// precipitation formation, cell potentials, mass deposition or heat change.
-//
-// The student begins by choosing which experiment type to practise (e.g.
-// titration, precipitation, galvanic cells, electrolysis or calorimetry).
-// The exam mode then presents only tasks relevant to that type.  Each task
-// still provides hints and solutions, and uses numeric or multiple choice
-// answers to evaluate the student’s understanding.  The interactive panels
-// are for visualisation and calculation support; answers are entered in
-// separate fields.
+/*
+ * SiU Lab – Magisk KjemiLab (Step 6)
+ *
+ * This version extends the practical laboratory exam game so that every
+ * experiment type contains a hands‑on simulation panel where the student
+ * selects reagents and equipment just as they would in a real laboratory.
+ *
+ * Major changes in this step:
+ *  • Precipitation (Felling) tasks now allow the student to choose two
+ *    salts from a list. The simulator computes whether a precipitate
+ *    forms and classifies it as insoluble, slightly soluble or soluble.
+ *    It also reports typical colours for common precipitates. Students
+ *    must pick the correct salt combination for the given question.
+ *  • The galvanic category has been renamed “Elektrokjemi” and now
+ *    comprises three sub‑experiments: galvanisk celle (galvanic cell),
+ *    elektrolyse (electrolysis of aqueous solutions) and smelte (molten
+ *    salt electrolysis). Each sub‑experiment presents its own panel with
+ *    appropriate choices: electrodes, electrolytes, salt bridge, water
+ *    addition and voltage source. Tasks check that the student selects
+ *    the correct configuration for the target reaction.
+ *  • Calorimetry panels now include apparatus selection (styrofoam cup
+ *    vs bomb calorimeter), a thermometer toggle and mass/temperature
+ *    inputs. Tasks may require students to choose the correct apparatus
+ *    for a given reaction.
+ *
+ * The overall structure remains similar to Step 5: the student starts
+ * on the home screen, selects an experiment type, and then answers a
+ * series of tasks. Each task presents a question, optional numeric or
+ * multiple‑choice answer input, hint/solution toggles, and an
+ * interactive panel matching the experiment. After all tasks are
+ * answered the student receives a score and can retry or choose another
+ * experiment.
+ */
 
 // -----------------------------------------------------------------------------
 // Constants and helpers
 
-// Acid/base/indicator definitions for the titration simulation (monoprotic).
+// Acid/base definitions for titration simulation.
 const ACIDS = {
   HCl: { name: 'HCl (saltsyre)', Ka: Infinity, strong: true, info: 'Sterk syre', colour: '#3461FF' },
   HNO3: { name: 'HNO₃ (salpetersyre)', Ka: Infinity, strong: true, info: 'Sterk syre', colour: '#2B7DFB' },
@@ -29,32 +45,31 @@ const ACIDS = {
   HCOOH: { name: 'HCOOH (maursyre)', Ka: 1.77e-4, strong: false, info: 'Svak syre', colour: '#7FB0FF' },
   HCN: { name: 'HCN (blåsyre)', Ka: 4.9e-10, strong: false, info: 'Meget svak syre', colour: '#B0C8FF' },
 };
-
 const BASES = {
   NaOH: { name: 'NaOH (natriumhydroksid)', Kb: Infinity, strong: true, info: 'Sterk base', colour: '#00C2D7' },
   KOH: { name: 'KOH (kaliumhydroksid)', Kb: Infinity, strong: true, info: 'Sterk base', colour: '#00D1E0' },
   NH3: { name: 'NH₃ (ammoniakk)', Kb: 1.8e-5, strong: false, info: 'Svak base', colour: '#28D8C5' },
   CH3NH2: { name: 'CH₃NH₂ (metylamin)', Kb: 4.4e-4, strong: false, info: 'Aminbase', colour: '#53E3C1' },
 };
-
+// Indicator definitions for titration.
 const INDICATORS = {
   Phenolphthalein: {
     name: 'Fenolftalein',
     range: [8.2, 10.0],
     colours: ['#FFFFFF', '#E83E8C'],
-    use: 'Svak syre mot sterk base; skifter i basisk område',
+    use: 'Svak syre ↔ sterk base (basisk område)',
   },
   MethylOrange: {
     name: 'Metyloransje',
     range: [3.1, 4.4],
     colours: ['#E74C3C', '#F1C40F'],
-    use: 'Sterk syre mot svak base; skifter i surt område',
+    use: 'Sterk syre ↔ svak base (surt område)',
   },
   BromothymolBlue: {
     name: 'Bromtymolblått',
     range: [6.0, 7.6],
     colours: ['#F4D03F', '#3498DB'],
-    use: 'Sterk syre mot sterk base; skifter rundt pH 7',
+    use: 'Sterk syre ↔ sterk base (nøytralområde)',
   },
   MethylRed: {
     name: 'Metylrødt',
@@ -64,28 +79,63 @@ const INDICATORS = {
   },
 };
 
-// Standard reduction potentials (V) versus SHE for selected couples.
+// Standard reduction potentials (V) versus SHE for common couples.
 const E0 = {
-  'Cu2+/Cu': 0.34,
-  'Zn2+/Zn': -0.76,
-  'Ag+/Ag': 0.80,
-  'Fe3+/Fe2+': 0.77,
+  'Cu': 0.34,
+  'Zn': -0.76,
+  'Ag': 0.80,
+  'Fe': -0.44, // Fe2+/Fe(s) (approx.), used for demonstration
 };
 
-// Solubility products (Ksp) for selected salts.
-const KSP = {
-  AgCl: 1.8e-10,
-  BaSO4: 1.1e-10,
-  CaCO3: 4.8e-9,
+// Solubility products (Ksp) and colour info for precipitation reactions.
+// The keys are the insoluble product formulas; each entry records Ksp and colour.
+const PRECIPITATE_INFO = {
+  'AgCl': { ksp: 1.8e-10, colour: 'hvitt' },
+  'BaSO4': { ksp: 1.1e-10, colour: 'hvitt' },
+  'CaCO3': { ksp: 4.8e-9, colour: 'hvitt' },
+  'Cu(OH)2': { ksp: 1.6e-19, colour: 'blått' },
+  'Fe(OH)3': { ksp: 2.8e-39, colour: 'rustbrunt' },
 };
 
-// Helper: log10 with safe domain.
+// Reaction map for precipitation tasks. Each key is a pair of salts
+// joined with '+', the value specifies the insoluble product formed (if any).
+const PRECIPITATION_REACTIONS = {
+  'AgNO3+NaCl': 'AgCl',
+  'AgNO3+KCl': 'AgCl',
+  'AgNO3+CaCl2': 'AgCl',
+  'CaCl2+Na2CO3': 'CaCO3',
+  'CaCl2+K2CO3': 'CaCO3',
+  'BaCl2+Na2SO4': 'BaSO4',
+  'BaCl2+K2SO4': 'BaSO4',
+  'CuSO4+NaOH': 'Cu(OH)2',
+  'FeCl3+NaOH': 'Fe(OH)3',
+};
+
+// List of salts available for precipitation experiments. Each entry has
+// a formula and a description. Only salts whose ions are present in
+// PRECIPITATION_REACTIONS or will not produce precipitate.
+const SALT_OPTIONS = [
+  { formula: 'AgNO3', description: 'Sølvnitrat' },
+  { formula: 'NaCl', description: 'Natriumklorid' },
+  { formula: 'KCl', description: 'Kaliumklorid' },
+  { formula: 'CaCl2', description: 'Kalsiumklorid' },
+  { formula: 'Na2CO3', description: 'Natriumkarbonat' },
+  { formula: 'K2CO3', description: 'Kaliumkarbonat' },
+  { formula: 'BaCl2', description: 'Bariumsalt av klorid' },
+  { formula: 'Na2SO4', description: 'Natriumsulfat' },
+  { formula: 'K2SO4', description: 'Kaliumsulfat' },
+  { formula: 'CuSO4', description: 'Kobbersulfat' },
+  { formula: 'NaOH', description: 'Natriumhydroksid' },
+  { formula: 'FeCl3', description: 'Jern(III)klorid' },
+];
+
+// Helper: safe log10
 function log10(x) {
   return Math.log(x) / Math.log(10);
 }
 
-// pH calculation helper for titrations (monoprotic).  Supports strong/strong,
-// weak/strong, strong/weak and weak/weak (approx.). Va and Vb in litres.
+// Computes pH for titration (monoprotic). Supports strong/strong, weak/strong,
+// strong/weak and weak/weak approximations. Va and Vb in litres. Ca, Cb in mol/L.
 function computePH(acid, base, Ca, Va, Cb, Vb) {
   const nA = Ca * Va;
   const nB = Cb * Vb;
@@ -131,7 +181,7 @@ function computePH(acid, base, Ca, Va, Cb, Vb) {
     }
     return -log10((nA - nB) / Vt);
   }
-  // weak/weak (approx.)
+  // weak/weak (approx)
   const pKa = -log10(acid.Ka);
   const pKb = -log10(base.Kb);
   if (Math.abs(nA - nB) < 1e-12) return 7 + 0.5 * (pKa - pKb);
@@ -139,7 +189,7 @@ function computePH(acid, base, Ca, Va, Cb, Vb) {
   return 14 - (-log10(base.Kb) + Math.log10(nA / (nB - nA)));
 }
 
-// Linear interpolation between two hex colours.
+// Linear interpolate between two hex colours.
 function interpolateColour(a, b, t) {
   const ah = parseInt(a.replace('#', ''), 16);
   const bh = parseInt(b.replace('#', ''), 16);
@@ -155,317 +205,191 @@ function interpolateColour(a, b, t) {
   return '#' + ((rr << 16) | (gg << 8) | bb2).toString(16).padStart(6, '0');
 }
 
-// Colour of solution based on pH for titration curve (blue–green–pink).
+// Colour gradient for pH indicator in titration panel.
 function pHColour(pH) {
   const t = Math.max(0, Math.min(1, pH / 14));
-  if (t < 0.5) {
-    return interpolateColour('#2B7DFB', '#5AD49E', t / 0.5);
-  }
+  if (t < 0.5) return interpolateColour('#2B7DFB', '#5AD49E', t / 0.5);
   return interpolateColour('#5AD49E', '#E83E8C', (t - 0.5) / 0.5);
 }
 
-// -----------------------------------------------------------------------------
-// Experiment definitions
+// Helper: clamp value between lo and hi.
+function clamp(v, lo, hi) {
+  if (v < lo) return lo;
+  if (v > hi) return hi;
+  return v;
+}
 
-// Define the list of experiment types available in exam mode.
+// Determine precipitate outcome when mixing two salts. Returns an object:
+// { product: string|null, ksp: number|null, colour: string|null, category: 'uløselig'|'tungtløselig'|'lettløselig' }
+function getPrecipitateOutcome(salt1, salt2) {
+  const key1 = `${salt1}+${salt2}`;
+  const key2 = `${salt2}+${salt1}`;
+  const prod = PRECIPITATION_REACTIONS[key1] || PRECIPITATION_REACTIONS[key2] || null;
+  if (!prod) {
+    return { product: null, ksp: null, colour: null, category: 'lettløselig' };
+  }
+  const info = PRECIPITATE_INFO[prod];
+  let category;
+  if (!info) {
+    category = 'tungtløselig';
+    return { product: prod, ksp: null, colour: null, category };
+  }
+  // Classify based on Ksp thresholds. These thresholds are arbitrary but
+  // illustrate the concept: very low Ksp (<1e-10) = insoluble, 1e-10 to 1e-6 = slightly soluble.
+  if (info.ksp < 1e-10) category = 'uløselig';
+  else if (info.ksp < 1e-6) category = 'tungtløselig';
+  else category = 'lettløselig';
+  return { product: prod, ksp: info.ksp, colour: info.colour, category };
+}
+
+// -----------------------------------------------------------------------------
+// Experiment definitions and tasks
+
+/*
+ * experimentTypes: list of high‑level experiment categories. Each entry has a
+ * key and a human‑readable name. The electrochemistry category has
+ * sub‑experiments handled by tasks themselves.
+ */
 const EXPERIMENT_TYPES = [
-  { key: 'titration', name: 'Titrering', description: 'Syre–base titrering med burette, indikator og pH‑kurve.' },
-  { key: 'precipitation', name: 'Felling', description: 'Løselighet og bunnfall ved blanding av ioneløsninger.' },
-  { key: 'galvanic', name: 'Galvanisk celle', description: 'Bygg en galvanisk celle og mål spenning.' },
-  { key: 'electrolysis', name: 'Elektrolyse', description: 'Beregn masse eller volum av produkter ved elektrolyse.' },
-  { key: 'calorimetry', name: 'Kalorimetri', description: 'Bestem varmeutvikling i en reaksjon via temperaturendring.' },
+  { key: 'titration', name: 'Titrering' },
+  { key: 'precipitation', name: 'Felling' },
+  { key: 'electrochem', name: 'Elektrokjemi' },
+  { key: 'calorimetry', name: 'Kalorimetri' },
 ];
 
-// Tasks for Step 5.  Each task belongs to a single experiment type and
-// contains everything needed for evaluation.  Interactive panels display
-// additional details but are not used for grading.  Titration tasks reuse
-// acid/base parameters from earlier steps.
+/*
+ * labTasks: list of all tasks. Each task includes:
+ * - experiment: high‑level category key
+ * - subExperiment: for electrochemistry tasks, the sub‑experiment key
+ *   ('galvanic', 'electrolysis', 'molten')
+ * - question: text shown to student
+ * - type: 'numeric', 'mcq', or 'interactive' (for titration and precipitation, electrochem)
+ * - choices: optional list of options for mcq tasks
+ * - answer: expected numeric value or index for mcq; null for interactive tasks
+ * - tolerance: acceptable deviation for numeric tasks
+ * - params: parameters for the experiment panel and evaluation
+ * - hint: hint text
+ * - solution: explanation text
+ */
 const LAB_TASKS = [
-  // Titration tasks (interactive; answer entered via simulation evaluation)
+  // Titration tasks (interactive)
   {
     experiment: 'titration',
-    question: 'Titrer 25,0 mL av en 0,10 M HCl‑løsning med 0,10 M NaOH til ekvivalens. Velg riktig indikator.',
-    type: 'titration',
-    acid: 'HCl',
-    base: 'NaOH',
-    Ca: 0.10,
-    Cb: 0.10,
-    Va: 0.025,
-    expectedVolume: 0.025,
-    indicator: 'BromothymolBlue',
-    answer: null, // interactive; evaluation uses evaluateInteractiveTask
-    hint: 'Sterk syre mot sterk base gir pH ≈ 7 ved ekvivalens. Velg indikator som skifter rundt nøytral pH.',
-    solution: 'Ved ekvivalens: V_b = (C_a·V_a)/C_b = (0,10·0,025)/0,10 = 0,025 L. pH ved ekvivalens ≈ 7 → Bromtymolblått passer.',
+    subExperiment: null,
+    question: 'Titrer 25,0 mL av en 0,10 M HCl‑løsning med 0,10 M NaOH. Velg indikator og still inn utstyret.',
+    type: 'interactive',
+    params: { acid: 'HCl', base: 'NaOH', Ca: 0.10, Cb: 0.10, Va: 0.025, indicator: 'BromothymolBlue', expectedVolume: 0.025 },
+    hint: 'Sterk syre ↔ sterk base gir pH ≈ 7 ved ekvivalens, så velg en indikator rundt nøytral pH.',
+    solution: 'Ekvivalens ved V_b = (C_a·V_a)/C_b = 0,025 L. Bromtymolblått skifter ved pH ~7.'
   },
   {
     experiment: 'titration',
-    question: 'Titrer 30,0 mL av en 0,10 M eddiksyre (CH₃COOH) med 0,10 M NaOH til ekvivalens. Velg riktig indikator.',
-    type: 'titration',
-    acid: 'CH3COOH',
-    base: 'NaOH',
-    Ca: 0.10,
-    Cb: 0.10,
-    Va: 0.030,
-    expectedVolume: 0.030,
-    indicator: 'Phenolphthalein',
-    answer: null,
-    hint: 'Svak syre titrert med sterk base gir pH > 7 ved ekvivalens. Velg en indikator med omslagsområde over 8.',
-    solution: 'V_b = (0,10·0,030)/0,10 = 0,030 L. CH₃COOH er en svak syre, så pH ved ekvivalens er over 7. Fenolftalein (pH 8,2–10) er best.',
+    subExperiment: null,
+    question: 'Titrer 30,0 mL av en 0,10 M CH₃COOH‑løsning med 0,10 M NaOH. Velg indikator.',
+    type: 'interactive',
+    params: { acid: 'CH3COOH', base: 'NaOH', Ca: 0.10, Cb: 0.10, Va: 0.030, indicator: 'Phenolphthalein', expectedVolume: 0.030 },
+    hint: 'Svak syre ↔ sterk base gir basisk pH ved ekvivalens.',
+    solution: 'Ekvivalens ved V_b = 0,030 L. Fenolftalein (pH 8,2–10) passer.'
   },
-  {
-    experiment: 'titration',
-    question: 'Titrer 20,0 mL av en 0,10 M HCl‑løsning med 0,10 M NH₃ til ekvivalens. Velg riktig indikator.',
-    type: 'titration',
-    acid: 'HCl',
-    base: 'NH3',
-    Ca: 0.10,
-    Cb: 0.10,
-    Va: 0.020,
-    expectedVolume: 0.020,
-    indicator: 'MethylOrange',
-    answer: null,
-    hint: 'Sterk syre mot svak base gir surt ekvivalenspunkt. Velg en indikator med omslagsområde i surt område.',
-    solution: 'V_b = (0,10·0,020)/0,10 = 0,020 L. HCl er sterk syre, NH₃ er svak base; pH ved ekvivalens er under 7. Metyloransje (pH 3,1–4,4) passer.',
-  },
-  {
-    experiment: 'titration',
-    question: 'Titrer 40,0 mL av en 0,10 M maursyre (HCOOH) med 0,10 M NaOH til ekvivalens. Velg riktig indikator.',
-    type: 'titration',
-    acid: 'HCOOH',
-    base: 'NaOH',
-    Ca: 0.10,
-    Cb: 0.10,
-    Va: 0.040,
-    expectedVolume: 0.040,
-    indicator: 'Phenolphthalein',
-    answer: null,
-    hint: 'Svak syre mot sterk base gir pH > 7 ved ekvivalens. Velg en basisk indikator.',
-    solution: 'V_b = (0,10·0,040)/0,10 = 0,040 L. Maursyre er svak syre; pH ved ekvivalens > 7, så fenolftalein er egnet.',
-  },
-  // Precipitation tasks (MCQ)
+  // Precipitation tasks (interactive)
   {
     experiment: 'precipitation',
-    question: 'Bestem om det dannes bunnfall når du blander 50,0 mL av 0,10 M AgNO₃ med 50,0 mL av 0,10 M NaCl. Bruk fellepanelet til å se Q og K_sp.',
-    type: 'mcq',
-    options: ['Ja', 'Nei'],
-    answer: 0,
-    params: { salt1: 'AgNO3', salt2: 'NaCl', c1: 0.10, c2: 0.10, v1: 0.050, v2: 0.050, ksp: KSP.AgCl, expectedPrecipitate: true },
-    hint: 'Beregn Q = [Ag⁺][Cl⁻] etter fortynning og sammenlign med K_sp.',
-    solution: '[Ag⁺] = [Cl⁻] = (0,10·0,050)/(0,100) = 0,05 M. Q = 0,05² = 2,5×10⁻³ >> 1,8×10⁻¹⁰, så bunnfall dannes.',
+    subExperiment: null,
+    question: 'Velg to salter som danner et hvitt uløselig bunnfall når de blandes. Angi også om bunnfallet er uløselig, tungtløselig eller lettløselig.',
+    type: 'interactive',
+    params: { expectedSalt1: 'AgNO3', expectedSalt2: 'NaCl', expectedCategory: 'uløselig', expectedColour: 'hvitt' },
+    hint: 'Tenk på sølvhalider og deres løselighet.',
+    solution: 'Ag⁺ reagerer med Cl⁻ til AgCl (K_sp ≈ 10⁻¹⁰). AgCl er uløselig og hvitt.'
   },
   {
     experiment: 'precipitation',
-    question: 'Vil BaSO₄ felles ut når 30,0 mL av 0,05 M BaCl₂ blandes med 70,0 mL av 0,05 M Na₂SO₄? Se på Q og K_sp.',
-    type: 'mcq',
-    options: ['Ja', 'Nei'],
-    answer: 0,
-    params: { salt1: 'BaCl2', salt2: 'Na2SO4', c1: 0.05, c2: 0.05, v1: 0.030, v2: 0.070, ksp: KSP.BaSO4, expectedPrecipitate: true },
-    hint: 'Q = [Ba²⁺][SO₄²⁻]; hvis Q > K_sp oppstår bunnfall.',
-    solution: '[Ba²⁺] = (0,05·0,030)/0,100 = 0,015 M; [SO₄²⁻] = (0,05·0,070)/0,100 = 0,035 M. Q = 5,25×10⁻⁴ >> 1,1×10⁻¹⁰ → bunnfall.',
+    subExperiment: null,
+    question: 'Bland to salter slik at du danner en blå felling av Cu(OH)₂. Velg riktig kombinasjon.',
+    type: 'interactive',
+    params: { expectedSalt1: 'CuSO4', expectedSalt2: 'NaOH', expectedCategory: 'uløselig', expectedColour: 'blått' },
+    hint: 'Kobber(II) danner et blått hydroksid når det reagerer med hydroksidioner.',
+    solution: 'Cu²⁺ + 2 OH⁻ → Cu(OH)₂ (K_sp ≈ 10⁻¹⁹). Kobbersulfat og natriumhydroksid gir et blått, uløselig bunnfall.'
   },
   {
     experiment: 'precipitation',
-    question: 'Vil CaCO₃ felles ut når 25,0 mL av 0,10 M Ca(NO₃)₂ blandes med 50,0 mL av 0,10 M Na₂CO₃? Se Q vs K_sp.',
-    type: 'mcq',
-    options: ['Ja', 'Nei'],
-    answer: 0,
-    params: { salt1: 'Ca(NO3)2', salt2: 'Na2CO3', c1: 0.10, c2: 0.10, v1: 0.025, v2: 0.050, ksp: KSP.CaCO3, expectedPrecipitate: true },
-    hint: 'Fortynn konsentrasjonene og sammenlign Q med K_sp for CaCO₃.',
-    solution: '[Ca²⁺] = (0,10·0,025)/(0,075) = 0,0333 M; [CO₃²⁻] = (0,10·0,050)/(0,075) = 0,0667 M; Q = 0,00222 >> 4,8×10⁻⁹ → bunnfall.',
+    subExperiment: null,
+    question: 'Velg to salter som ikke danner bunnfall når de blandes (lettløselige ioner).',
+    type: 'interactive',
+    params: { expectedSalt1: 'NaCl', expectedSalt2: 'K2SO4', expectedCategory: 'lettløselig', expectedColour: null },
+    hint: 'Salter fra alkalimetaller og sulfater er generelt lettløselige.',
+    solution: 'Natrium- og kaliumsalter er generelt løselige. Blandingen gir ingen felling.'
   },
-  // Galvanic cell tasks (numeric)
+  // Electrochemistry tasks
   {
-    experiment: 'galvanic',
-    question: 'Bygg en galvanisk celle med Zn(s)/Zn²⁺(1,0 M) og Cu²⁺(1,0 M)/Cu(s). Hva er E° for cellen?',
-    type: 'numeric',
-    answer: 1.10,
-    tolerance: 0.05,
-    params: { anode: 'Zn2+/Zn', cathode: 'Cu2+/Cu' },
-    hint: 'E°_celle = E°_katode − E°_anode. Zn→Zn²⁺ oksidasjon; Cu²⁺→Cu reduksjon.',
-    solution: 'Katode: Cu²⁺/Cu (0,34 V), Anode: Zn²⁺/Zn (−0,76 V). E° = 0,34 − (−0,76) = 1,10 V.',
+    experiment: 'electrochem',
+    subExperiment: 'galvanic',
+    question: 'Bygg en galvanisk celle som produserer omtrent 1,10 V. Velg riktige elektroder (anode og katode) og saltbro.',
+    type: 'interactive',
+    params: { correctAnode: 'Zn', correctCathode: 'Cu', correctSaltBridge: 'KNO3' },
+    hint: 'En Zn/Cu-celle med KNO₃-saltbro gir E° ≈ 1,10 V.',
+    solution: 'Anoden er Zn(s) → Zn²⁺ (oksidasjon). Katoden er Cu²⁺ → Cu(s) (reduksjon). Saltbro KNO₃ fullfører kretsen. Gir E°=1,10 V.'
   },
   {
-    experiment: 'galvanic',
-    question: 'Bygg en galvanisk celle med Fe³⁺/Fe²⁺ og Ag⁺/Ag. Hva er E° for cellen?',
-    type: 'numeric',
-    answer: 0.03,
-    tolerance: 0.05,
-    params: { anode: 'Fe3+/Fe2+', cathode: 'Ag+/Ag' },
-    hint: 'Velg reaksjonen med høyest E° som katode.',
-    solution: 'E°(Fe³⁺/Fe²⁺)=0,77 V; E°(Ag⁺/Ag)=0,80 V. Katode: Ag⁺/Ag, Anode: Fe³⁺/Fe²⁺. E° = 0,80 − 0,77 = 0,03 V.',
-  },
-  // Electrolysis tasks (numeric)
-  {
-    experiment: 'electrolysis',
-    question: 'Elektrolyser en CuSO₄-løsning med strøm 1,50 A i 2000 s. Hvor mange gram Cu avsettes?',
-    type: 'numeric',
-    answer: 0.99,
-    tolerance: 0.05,
-    params: { metal: 'Cu', current: 1.5, time: 2000, z: 2, M: 63.546 },
-    hint: 'Faradays lov: m = (I·t)/(z·F) · M.',
-    solution: 'm = (1,50·2000)/(2·96485)·63,546 ≈ 0,99 g.',
+    experiment: 'electrochem',
+    subExperiment: 'electrolysis',
+    question: 'Elektrolyser en 0,1 M CuSO₄-løsning. Velg riktige elektroder (anode/kathode) og angi om vann må være tilstede. Hvilket produkt avsettes på katoden?',
+    type: 'interactive',
+    params: { expectedCathode: 'Cu', expectedAnode: 'Graphite', requiresWater: true, expectedProduct: 'Cu' },
+    hint: 'I elektrolyse av CuSO₄(aq) deponeres Cu på katoden. Bruk kobberkatode og inert anode.',
+    solution: 'Kobber(II)sulfat i vann gir Cu²⁺ + SO₄²⁻. Ved katoden reduseres Cu²⁺ til Cu(s) (bruk kobber-elektrode). Anoden bør være inert (grafitt eller Pt). Vann må være tilstede.'
   },
   {
-    experiment: 'electrolysis',
-    question: 'Elektrolyser en AgNO₃-løsning med strøm 0,800 A i 1200 s. Hvor mange gram Ag avsettes?',
-    type: 'numeric',
-    answer: 1.07,
-    tolerance: 0.05,
-    params: { metal: 'Ag', current: 0.8, time: 1200, z: 1, M: 107.868 },
-    hint: 'Bruk Faradays lov. Husk z for sølv.',
-    solution: 'm = (0,800·1200)/(1·96485)·107,868 ≈ 1,07 g.',
+    experiment: 'electrochem',
+    subExperiment: 'molten',
+    question: 'Elektrolyser smeltet NaCl (smelte). Velg riktige elektroder og angi om vann brukes. Hvilke produkter dannes ved elektrodene?',
+    type: 'interactive',
+    params: { expectedCathode: 'Graphite', expectedAnode: 'Graphite', requiresWater: false, expectedProductCathode: 'Na', expectedProductAnode: 'Cl2' },
+    hint: 'Smeltet NaCl gir Na(l) ved katoden og Cl₂(g) ved anoden. Ingen vann skal tilsettes.',
+    solution: 'I smeltet NaCl: Na⁺ + e⁻ → Na(l) ved katoden; 2 Cl⁻ → Cl₂(g) + 2 e⁻ ved anoden. Elektrodene kan være grafitt. Vann må ikke være tilstede.'
   },
-  // Calorimetry tasks (numeric)
+  // Calorimetry tasks
   {
     experiment: 'calorimetry',
-    question: 'I et kalorimeter blandes 100,0 g vann med 0,50 M HCl og 0,50 M NaOH (samme volum). Temperaturen stiger fra 20,0 °C til 26,0 °C. Hvor mye varme (kJ) er frigitt til vannet?',
-    type: 'numeric',
-    answer: 2.51,
-    tolerance: 0.10,
-    params: { mass: 100, deltaT: 6.0, Cp: 4.18 },
-    hint: 'q = m·C_p·ΔT; konverter J til kJ.',
-    solution: 'q = 100 g·4,18 J/g·K·6,0 K = 2508 J = 2,51 kJ.',
+    subExperiment: null,
+    question: 'Et nøytralt kalorimeter består av to isoporkopper med vann, termometer og omrører. Velg riktig oppsett for å måle nøytraliseringsvarme ved blanding av HCl og NaOH.',
+    type: 'interactive',
+    params: { correctCalorimeter: 'Styrofoam', requiresThermometer: true, requiresStirrer: true, mass: 100, deltaT: 5.0, Cp: 4.18 },
+    hint: 'Isoporkopper isolerer godt. Termometer og omrører er nødvendig.',
+    solution: 'Et typisk enkelt kalorimeter: to isoporkopper for isolasjon, termometer for temperaturmåling og omrører for jevn temperatur. q = m·C·ΔT.'
   },
   {
     experiment: 'calorimetry',
-    question: '200,0 g vann varmes opp 5,0 °C i en kalorimeter. Hvor mye varme (kJ) er tilført?',
-    type: 'numeric',
-    answer: 4.18,
-    tolerance: 0.10,
-    params: { mass: 200, deltaT: 5.0, Cp: 4.18 },
-    hint: 'q = m·C_p·ΔT; m = masse vann.',
-    solution: 'q = 200 g·4,18 J/g·K·5,0 K = 4180 J = 4,18 kJ.',
+    subExperiment: null,
+    question: 'For en forbrenningsreaksjon i en bombekalorimeter, velg riktig apparat og beregn varmen fra ΔT = 3 °C, C_bomb = 10 kJ/°C.',
+    type: 'interactive',
+    params: { correctCalorimeter: 'Bomb', requiresThermometer: true, requiresStirrer: false, bombConstant: 10, deltaT: 3.0 },
+    hint: 'Bombekalorimeter har kjent varme-kapasitet; q = C_bomb·ΔT.',
+    solution: 'Bombekalorimeter krever termometer. Omrører er ikke alltid nødvendig. q = 10 kJ/°C × 3 °C = 30 kJ.'
   },
 ];
 
 // -----------------------------------------------------------------------------
-// Panels for each experiment type
+// Interactive panels for each experiment type
 
-// Precipitation panel: shows mixture of two salts, volumes, concentrations and
-// calculates Q vs Ksp.  The student can adjust volumes, but grading is based
-// on answering MCQ in the task.
-function PrecipitationPanel({ task }) {
-  const { salt1, salt2, c1, c2, v1, v2, ksp } = task.params;
-  const [vol1, setVol1] = useState(v1);
-  const [vol2, setVol2] = useState(v2);
-  const total = vol1 + vol2;
-  const conc1 = total > 0 ? (c1 * vol1) / total : 0;
-  const conc2 = total > 0 ? (c2 * vol2) / total : 0;
-  const Q = conc1 * conc2;
-  const precip = Q > ksp;
-  return (
-    <div className="panel" style={{ marginTop: '1rem' }}>
-      <h4>Felleforsøk</h4>
-      <p>Bland {salt1} og {salt2}.</p>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <label>Volum {salt1} (L)
-          <input type="number" step="0.001" value={vol1} onChange={e => setVol1(parseFloat(e.target.value) || 0)} />
-        </label>
-        <label>Volum {salt2} (L)
-          <input type="number" step="0.001" value={vol2} onChange={e => setVol2(parseFloat(e.target.value) || 0)} />
-        </label>
-      </div>
-      <p>Q = {Q.toExponential(2)}; K<sub>sp</sub> = {ksp.toExponential(2)} → {precip ? 'Bunnfall dannes' : 'Ingen bunnfall'}</p>
-    </div>
-  );
-}
-
-// Galvanic cell panel: shows half-cells, allows student to choose anode and
-// cathode (read-only for this exercise) and computes cell potential.
-function GalvanicPanel({ task }) {
-  const { anode, cathode } = task.params;
-  const potential = E0[cathode] - E0[anode];
-  return (
-    <div className="panel" style={{ marginTop: '1rem' }}>
-      <h4>Galvanisk celle</h4>
-      <p>Katode: {cathode}, Anode: {anode}</p>
-      <p>E°<sub>celle</sub> = E°({cathode}) − E°({anode}) = {potential.toFixed(2)} V</p>
-    </div>
-  );
-}
-
-// Electrolysis panel: shows current and time and computes mass deposited for a given metal.
-function ElectrolysisPanel({ task }) {
-  const { current, time, z, M, metal } = task.params;
-  const [I, setI] = useState(current);
-  const [t, setT] = useState(time);
-  const F = 96485;
-  const molesElectron = (I * t) / F;
-  const molesMetal = molesElectron / z;
-  const mass = molesMetal * M;
-  return (
-    <div className="panel" style={{ marginTop: '1rem' }}>
-      <h4>Elektrolyse</h4>
-      <p>Metall: {metal}</p>
-      <label>Strøm (A)
-        <input type="number" step="0.01" value={I} onChange={e => setI(parseFloat(e.target.value) || 0)} />
-      </label>
-      <label>Tid (s)
-        <input type="number" step="1" value={t} onChange={e => setT(parseFloat(e.target.value) || 0)} />
-      </label>
-      <p>Masse {metal} = {mass.toFixed(3)} g</p>
-    </div>
-  );
-}
-
-// Calorimetry panel: shows mass, Cp and ΔT and computes heat change.
-function CalorimetryPanel({ task }) {
-  const { mass, deltaT, Cp } = task.params;
-  const [m, setM] = useState(mass);
-  const [dT, setDT] = useState(deltaT);
-  const qJ = m * Cp * dT;
-  const qkJ = qJ / 1000;
-  return (
-    <div className="panel" style={{ marginTop: '1rem' }}>
-      <h4>Kalorimetri</h4>
-      <label>Masse vann (g)
-        <input type="number" step="1" value={m} onChange={e => setM(parseFloat(e.target.value) || 0)} />
-      </label>
-      <label>Temperaturendring (°C)
-        <input type="number" step="0.1" value={dT} onChange={e => setDT(parseFloat(e.target.value) || 0)} />
-      </label>
-      <p>q = {qkJ.toFixed(2)} kJ</p>
-    </div>
-  );
-}
-
-// -----------------------------------------------------------------------------
-// Main component
-
-export default function TitrationGame() {
-  // Overall view state: 'home' | 'select' | 'exam' | 'results'
-  const [view, setView] = useState('home');
-  // Selected experiment type key
-  const [selectedExperiment, setSelectedExperiment] = useState(null);
-  // Exam tasks and progress
-  const [tasks, setTasks] = useState([]);
-  const [taskIndex, setTaskIndex] = useState(0);
-  const [userInput, setUserInput] = useState('');
-  const [examScore, setExamScore] = useState(0);
-  const [showHint, setShowHint] = useState(false);
-  const [showSolution, setShowSolution] = useState(false);
-  // Score history to track attempts (unused yet but could be added)
-
-  // Simulation state for titration
-  const [acidKey, setAcidKey] = useState('HCl');
-  const [baseKey, setBaseKey] = useState('NaOH');
-  const [Ca, setCa] = useState(0.10);
-  const [Cb, setCb] = useState(0.10);
-  const [Va, setVa] = useState(0.025);
+// Titration panel: reused from previous steps. Students can adjust acid/base,
+// concentrations, volumes and indicator and titrate to equivalence. For step 6 we
+// incorporate evaluation via evaluateTitrationTask.
+function TitrationPanel({ params, evaluate }) {
+  const { acid: acidInit, base: baseInit, Ca: CaInit, Cb: CbInit, Va: VaInit, indicator: indicatorInit, expectedVolume } = params;
+  const [acidKey, setAcidKey] = useState(acidInit);
+  const [baseKey, setBaseKey] = useState(baseInit);
+  const [Ca, setCa] = useState(CaInit);
+  const [Cb, setCb] = useState(CbInit);
+  const [Va, setVa] = useState(VaInit);
   const [Vb, setVb] = useState(0);
-  const [indicatorKey, setIndicatorKey] = useState('BromothymolBlue');
+  const [indicatorKey, setIndicatorKey] = useState(indicatorInit);
+
   const acid = ACIDS[acidKey];
   const base = BASES[baseKey];
   const indicator = INDICATORS[indicatorKey];
 
-  // Derived values for titration simulation
-  const equivalence = useMemo(() => {
-    return Cb > 0 ? (Ca * Va) / Cb : Infinity;
-  }, [Ca, Va, Cb]);
-  const pH = useMemo(() => {
-    const value = computePH(acid, base, Ca, Va, Cb, Vb);
-    return isNaN(value) ? 7 : value;
-  }, [acid, base, Ca, Va, Cb, Vb]);
+  const equivalence = useMemo(() => (Cb > 0 ? (Ca * Va) / Cb : Infinity), [Ca, Va, Cb]);
+  const pH = useMemo(() => computePH(acid, base, Ca, Va, Cb, Vb), [acid, base, Ca, Va, Cb, Vb]);
   const solutionColour = useMemo(() => {
     const [start, end] = indicator.range;
     const [c1, c2] = indicator.colours;
@@ -475,59 +399,15 @@ export default function TitrationGame() {
     else t = (pH - start) / (end - start);
     return interpolateColour(c1, c2, Math.max(0, Math.min(1, t)));
   }, [indicator, pH]);
-  const clamp = (v, lo, hi) => {
-    if (v < lo) return lo;
-    if (v > hi) return hi;
-    return v;
-  };
   const buretteLevel = useMemo(() => {
     const total = equivalence !== Infinity ? equivalence * 2 : (Cb > 0 ? (Ca * Va) / Cb * 2 : 0.05);
-    if (!total || total <= 0) return 0;
-    return clamp((total - Vb) / total, 0, 1);
+    return total > 0 ? clamp((total - Vb) / total, 0, 1) : 0;
   }, [equivalence, Ca, Va, Cb, Vb]);
   const flaskLevel = useMemo(() => {
     const maxV = equivalence !== Infinity ? Va + equivalence * 2 : Va + (Cb > 0 ? (Ca * Va) / Cb * 2 : 0.05);
-    if (!maxV || maxV <= 0) return 0;
-    return clamp((Va + Vb) / maxV, 0, 1);
+    return maxV > 0 ? clamp((Va + Vb) / maxV, 0, 1) : 0;
   }, [Va, Vb, equivalence, Ca, Cb]);
 
-  // Graph path for titration curve
-  const graphPath = useMemo(() => {
-    if (Cb <= 0) return '';
-    const Vmax = equivalence * 1.5 || 0.05;
-    const samples = 150;
-    let d = '';
-    for (let i = 0; i <= samples; i++) {
-      const V = (Vmax * i) / samples;
-      const phVal = computePH(acid, base, Ca, Va, Cb, V);
-      const x = (300 * i) / samples;
-      const y = 180 - (Math.max(0, Math.min(14, phVal)) / 14) * 180;
-      if (i === 0) d += `M ${x.toFixed(1)} ${y.toFixed(1)}`;
-      else d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
-    }
-    return d;
-  }, [acid, base, Ca, Va, Cb, equivalence]);
-
-  // Helper for titration evaluation: checks acid/base/indicator/volume against task
-  function evaluateTitrationTask(task) {
-    let feedback = [];
-    let correct = true;
-    if (acidKey !== task.acid) { correct = false; feedback.push('Feil syre.'); }
-    if (baseKey !== task.base) { correct = false; feedback.push('Feil base.'); }
-    if (indicatorKey !== task.indicator) { correct = false; feedback.push('Feil indikator.'); }
-    if (Math.abs(Ca - task.Ca) > 0.001) { correct = false; feedback.push('Feil konsentrasjon på syre.'); }
-    if (Math.abs(Cb - task.Cb) > 0.001) { correct = false; feedback.push('Feil konsentrasjon på base.'); }
-    if (Math.abs(Va - task.Va) > 1e-5) { correct = false; feedback.push('Feil volum av syre.'); }
-    if (Math.abs(Vb - task.expectedVolume) > 0.0005) { correct = false; feedback.push('Feil titrantvolum ved ekvivalens.'); }
-    if (correct) feedback.push('Alt stemmer!');
-    return { correct, feedback: feedback.join(' ') };
-  }
-
-  // Reset titration simulation
-  function resetTitration() {
-    setVb(0);
-  }
-  // Add titrant volume
   function addVolume(delta) {
     setVb(prev => {
       const maxV = equivalence !== Infinity ? equivalence * 2 : (Cb > 0 ? (Ca * Va) / Cb * 2 : 0.05);
@@ -536,105 +416,28 @@ export default function TitrationGame() {
     });
   }
 
-  // Start exam for selected experiment type
-  function startExamFor(type) {
-    const filtered = LAB_TASKS.filter(t => t.experiment === type);
-    setSelectedExperiment(type);
-    setTasks(filtered);
-    setTaskIndex(0);
-    setExamScore(0);
-    setUserInput('');
-    setShowHint(false);
-    setShowSolution(false);
-    setView('exam');
+  function reset() { setVb(0); }
+
+  // Evaluate the titration configuration when requested. Returns feedback
+  // string and whether the answer is correct according to params.
+  function check() {
+    let feedback = [];
+    let correct = true;
+    if (acidKey !== acidInit) { feedback.push('Feil syre'); correct = false; }
+    if (baseKey !== baseInit) { feedback.push('Feil base'); correct = false; }
+    if (Math.abs(Ca - CaInit) > 0.001) { feedback.push('Feil Ca'); correct = false; }
+    if (Math.abs(Cb - CbInit) > 0.001) { feedback.push('Feil Cb'); correct = false; }
+    if (Math.abs(Va - VaInit) > 1e-5) { feedback.push('Feil Va'); correct = false; }
+    if (Math.abs(Vb - expectedVolume) > 0.0005) { feedback.push('Feil Vb ved ekvivalens'); correct = false; }
+    if (indicatorKey !== indicatorInit) { feedback.push('Feil indikator'); correct = false; }
+    if (correct) feedback.push('Alt korrekt!');
+    return { correct, feedback: feedback.join('. ') };
   }
 
-  // Submit answer for current task
-  function submitAnswer() {
-    const task = tasks[taskIndex];
-    let isCorrect = false;
-    let feedback = '';
-    if (task.type === 'titration') {
-      const result = evaluateTitrationTask(task);
-      isCorrect = result.correct;
-      feedback = result.feedback;
-    } else if (task.type === 'numeric') {
-      const val = parseFloat(userInput);
-      if (!isNaN(val) && Math.abs(val - task.answer) <= (task.tolerance || 0.05)) isCorrect = true;
-    } else if (task.type === 'mcq') {
-      if (parseInt(userInput, 10) === task.answer) isCorrect = true;
-    }
-    if (isCorrect) setExamScore(prev => prev + 1);
-    // Advance or finish
-    if (taskIndex + 1 < tasks.length) {
-      setTaskIndex(prev => prev + 1);
-      setUserInput('');
-      setShowHint(false);
-      setShowSolution(false);
-    } else {
-      setView('results');
-    }
-  }
-
-  // Navigation: previous task
-  function prevTask() {
-    if (taskIndex > 0) {
-      setTaskIndex(prev => prev - 1);
-      setUserInput('');
-      setShowHint(false);
-      setShowSolution(false);
-    }
-  }
-  // Random task
-  function randomTask() {
-    const idx = Math.floor(Math.random() * tasks.length);
-    setTaskIndex(idx);
-    setUserInput('');
-    setShowHint(false);
-    setShowSolution(false);
-  }
-
-  // Reset entire exam selection
-  function resetExam() {
-    setSelectedExperiment(null);
-    setTasks([]);
-    setTaskIndex(0);
-    setExamScore(0);
-    setUserInput('');
-    setView('select');
-  }
-
-  // Views
-  const HomeView = () => (
-    <div style={{ textAlign: 'center' }}>
-      <h2>Velkommen til SiU Magisk KjemiLab</h2>
-      <p>Øv på praktiske laboratorieoppgaver fra Kjemi 2. Velg en eksperimenttype for å starte en eksamen.</p>
-      <button className="button-primary" onClick={() => setView('select')} style={{ padding: '0.8rem 1.2rem', fontSize: '1rem', marginTop: '1rem' }}>Start eksamen</button>
-      <button className="button-secondary" onClick={() => setView('titration')} style={{ padding: '0.8rem 1.2rem', fontSize: '1rem', marginTop: '1rem', marginLeft: '1rem' }}>Utforsk titrering</button>
-    </div>
-  );
-
-  const SelectExperimentView = () => (
+  return (
     <div>
-      <h3>Velg eksperimenttype</h3>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
-        {EXPERIMENT_TYPES.map(({ key, name, description }) => (
-          <div key={key} className="panel" style={{ flex: '1 1 45%', cursor: 'pointer' }} onClick={() => startExamFor(key)}>
-            <h4>{name}</h4>
-            <p style={{ fontSize: '0.9rem' }}>{description}</p>
-          </div>
-        ))}
-      </div>
-      <button className="button-secondary" onClick={() => setView('home')} style={{ marginTop: '1rem' }}>Tilbake</button>
-    </div>
-  );
-
-  // Panel for titration simulation (similar to Step4 but simplified).  We reuse the
-  // same controls and lab illustration as the titration view from earlier steps.
-  const TitrationPanel = () => (
-    <div>
-      <div className="panel" style={{ marginBottom: '1rem' }}>
-        <h4>Kontroller</h4>
+      <div className="panel" style={{ marginBottom: '0.8rem' }}>
+        <h4>Titreringskontroller</h4>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
           <label>Syre
             <select value={acidKey} onChange={e => setAcidKey(e.target.value)}>
@@ -656,7 +459,7 @@ export default function TitrationGame() {
             <input type="number" step="0.001" value={Va} onChange={e => setVa(parseFloat(e.target.value) || 0)} />
           </label>
           <label>Vb (L)
-            <input type="number" step="0.001" value={Vb} onChange={e => setVb(parseFloat(e.target.value) || 0)} />
+            <input type="number" step="0.0005" value={Vb} onChange={e => setVb(parseFloat(e.target.value) || 0)} />
           </label>
           <label>Indikator
             <select value={indicatorKey} onChange={e => setIndicatorKey(e.target.value)}>
@@ -664,17 +467,22 @@ export default function TitrationGame() {
             </select>
           </label>
         </div>
-        <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+        <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.4rem' }}>
           <button className="button-primary" onClick={() => addVolume(0.0005)}>+0,5 mL</button>
           <button className="button-primary" onClick={() => addVolume(0.001)}>+1,0 mL</button>
-          <button className="button-secondary" onClick={resetTitration}>Nullstill</button>
+          <button className="button-secondary" onClick={reset}>Nullstill</button>
+          <button className="button-primary" onClick={() => {
+            const res = check();
+            alert(res.feedback);
+            evaluate(res.correct);
+          }}>Kontroller</button>
         </div>
-        <p style={{ marginTop: '0.5rem' }}>pH: {pH.toFixed(2)} – Ekvivalens ved V_b = {equivalence === Infinity ? '-' : equivalence.toFixed(3)} L</p>
+        <p style={{ marginTop: '0.4rem' }}>pH: {pH.toFixed(2)} – Ekvivalens ved V_b = {equivalence === Infinity ? '-' : equivalence.toFixed(3)} L</p>
       </div>
       <div className="panel" style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: '1rem' }}>
-        {/* Lab illustration */}
         <div>
-          <svg width="260" height="320" viewBox="0 0 700 320">
+          {/* Lab illustration similar to Step5 but with dynamic fill */}
+          <svg width="240" height="300" viewBox="0 0 700 320">
             <defs>
               <linearGradient id="glassGrad" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
@@ -691,39 +499,27 @@ export default function TitrationGame() {
             {/* Burette stand */}
             <rect x="20" y="0" width="10" height="240" fill="#64748b" />
             <rect x="20" y="240" width="120" height="8" fill="#475569" rx="3" />
-            {/* Burette tube and contents */}
+            {/* Burette tube */}
             <g transform="translate(50,10)">
               <rect x="0" y="0" width="20" height="200" fill="url(#glassGrad)" stroke="#94a3b8" strokeWidth="1" rx="6" />
+              {/* Tick marks */}
               {Array.from({ length: 21 }).map((_, i) => {
                 const y = i * 10;
-                return (
-                  <line
-                    key={i}
-                    x1="0"
-                    x2={i % 5 === 0 ? -8 : -5}
-                    y1={y}
-                    y2={y}
-                    stroke="#64748b"
-                    strokeWidth={i % 5 === 0 ? 2 : 1}
-                  />
-                );
+                return <line key={i} x1="0" x2={i % 5 === 0 ? -8 : -5} y1={y} y2={y} stroke="#64748b" strokeWidth={i % 5 === 0 ? 2 : 1} />;
               })}
+              {/* Liquid level */}
               <rect x="1" y="0" width="18" height={200 * buretteLevel} fill={solutionColour} opacity="0.65" />
-              <ellipse
-                cx="10"
-                cy={200 * buretteLevel}
-                rx="9"
-                ry="3"
-                fill="url(#meniscusGrad)"
-                opacity="0.8"
-              />
+              {/* Meniscus */}
+              <ellipse cx="10" cy={200 * buretteLevel} rx="9" ry="3" fill="url(#meniscusGrad)" opacity="0.8" />
+              {/* Stopcock */}
               <rect x="17" y="200" width="10" height="12" fill="#94a3b8" rx="2" />
               <rect x="25" y="210" width="35" height="6" fill="#94a3b8" rx="3" />
             </g>
+            {/* Dripping droplet */}
             {Vb > 0 && (
               <g>
                 <circle cx="120" cy="225" r="4" fill={solutionColour}>
-                  <animate attributeName="cy" values="210; 225; 210" dur="1.8s" repeatCount="indefinite" />
+                  <animate attributeName="cy" values="210;225;210" dur="1.8s" repeatCount="indefinite" />
                 </circle>
               </g>
             )}
@@ -735,18 +531,8 @@ export default function TitrationGame() {
                 const h = Math.max(1, 70 * flaskLevel);
                 return (
                   <g>
-                    <path
-                      d={'M10,90 C12,' + (90 - h) + ' 100,' + (90 - h) + ' 102,90 Z'}
-                      fill={solutionColour}
-                      opacity="0.45"
-                    />
-                    <path
-                      d={'M12,' + (90 - h) + ' Q56,' + (90 - h - 6) + ' 98,' + (90 - h)}
-                      stroke={solutionColour}
-                      strokeOpacity="0.6"
-                      strokeWidth="2"
-                      fill="none"
-                    />
+                    <path d={`M10,90 C12,${90 - h} 100,${90 - h} 102,90 Z`} fill={solutionColour} opacity="0.45" />
+                    <path d={`M12,${90 - h} Q56,${90 - h - 6} 98,${90 - h}`} stroke={solutionColour} strokeOpacity="0.6" strokeWidth="2" fill="none" />
                   </g>
                 );
               })()}
@@ -817,76 +603,405 @@ export default function TitrationGame() {
       </div>
     </div>
   );
+}
 
-  // Exam view: shows current task, answer input, hint, solution and corresponding panel
+// Precipitation panel: allows selection of two salts and volumes; computes
+// precipitate outcome and classification. When evaluate() is called, the
+// chosen salts are compared with expected values in params.
+function PrecipitationPanel({ params, evaluate }) {
+  const { expectedSalt1, expectedSalt2, expectedCategory, expectedColour } = params;
+  const [salt1, setSalt1] = useState(expectedSalt1);
+  const [salt2, setSalt2] = useState(expectedSalt2);
+  const [vol1, setVol1] = useState(0.05);
+  const [vol2, setVol2] = useState(0.05);
+  const outcome = useMemo(() => getPrecipitateOutcome(salt1, salt2), [salt1, salt2]);
+  function check() {
+    let correct = true;
+    let feedback = [];
+    // check chosen salts (order not important)
+    const chosen = [salt1, salt2].sort().join('+');
+    const expected = [expectedSalt1, expectedSalt2].sort().join('+');
+    if (chosen !== expected) {
+      correct = false;
+      feedback.push('Feil kombinasjon av salter');
+    }
+    if (expectedColour && outcome.colour !== expectedColour) {
+      correct = false;
+      feedback.push('Feil farge på bunnfall');
+    }
+    if (expectedCategory && outcome.category !== expectedCategory) {
+      correct = false;
+      feedback.push(`Feil kategori: du valgte ${outcome.category}`);
+    }
+    if (correct) feedback.push('Riktig!');
+    alert(feedback.join('. '));
+    evaluate(correct);
+  }
+  return (
+    <div className="panel" style={{ marginTop: '0.8rem' }}>
+      <h4>Fellepanel</h4>
+      <p>Velg to ioneløsninger (salter). Resultatet vises automatisk.</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <label>Salt 1
+          <select value={salt1} onChange={e => setSalt1(e.target.value)}>
+            {SALT_OPTIONS.map(opt => <option key={opt.formula} value={opt.formula}>{opt.description}</option>)}
+          </select>
+        </label>
+        <label>Salt 2
+          <select value={salt2} onChange={e => setSalt2(e.target.value)}>
+            {SALT_OPTIONS.map(opt => <option key={opt.formula} value={opt.formula}>{opt.description}</option>)}
+          </select>
+        </label>
+        <label>Volum salt 1 (L)
+          <input type="number" step="0.001" value={vol1} onChange={e => setVol1(parseFloat(e.target.value) || 0)} />
+        </label>
+        <label>Volum salt 2 (L)
+          <input type="number" step="0.001" value={vol2} onChange={e => setVol2(parseFloat(e.target.value) || 0)} />
+        </label>
+      </div>
+      <p>Bunnfall: {outcome.product ? outcome.product : 'ingen'}</p>
+      <p>Kategori: {outcome.category}</p>
+      {outcome.colour && <p>Farge: {outcome.colour}</p>}
+      <button className="button-primary" onClick={check}>Kontroller</button>
+    </div>
+  );
+}
+
+// Electrochemistry panel: covers galvanic, electrolysis and molten experiments.
+function ElectrochemPanel({ params, subExperiment, evaluate }) {
+  // Shared state: chosen electrodes, salt bridge, solution type, water addition
+  const metalOptions = ['Zn', 'Cu', 'Ag', 'Fe'];
+  const electrodeOptions = ['Graphite', 'Copper', 'Platinum'];
+  const saltBridgeOptions = ['KNO3', 'NaNO3', 'NH4NO3'];
+  const electrolyteOptions = ['CuSO4(aq)', 'NaCl(aq)', 'NaCl(l)', 'H2O'];
+  const [anode, setAnode] = useState(params.correctAnode || 'Zn');
+  const [cathode, setCathode] = useState(params.correctCathode || 'Cu');
+  const [saltBridge, setSaltBridge] = useState(params.correctSaltBridge || 'KNO3');
+  const [electrolyte, setElectrolyte] = useState('CuSO4(aq)');
+  const [useWater, setUseWater] = useState(params.requiresWater || false);
+  const [voltage, setVoltage] = useState(3.0);
+
+  function check() {
+    let correct = true;
+    let feedback = [];
+    if (subExperiment === 'galvanic') {
+      if (anode !== params.correctAnode) { correct = false; feedback.push('Feil anode'); }
+      if (cathode !== params.correctCathode) { correct = false; feedback.push('Feil katode'); }
+      if (saltBridge !== params.correctSaltBridge) { correct = false; feedback.push('Feil saltbro'); }
+    } else if (subExperiment === 'electrolysis') {
+      if (cathode !== params.expectedCathode) { correct = false; feedback.push('Feil katode'); }
+      if (anode !== params.expectedAnode) { correct = false; feedback.push('Feil anode'); }
+      if (useWater !== params.requiresWater) { correct = false; feedback.push(params.requiresWater ? 'Vann må være tilstede' : 'Vann skal ikke brukes'); }
+    } else if (subExperiment === 'molten') {
+      if (cathode !== params.expectedCathode) { correct = false; feedback.push('Feil katode'); }
+      if (anode !== params.expectedAnode) { correct = false; feedback.push('Feil anode'); }
+      if (useWater !== params.requiresWater) { correct = false; feedback.push('Vann må ikke tilsettes i smelte'); }
+    }
+    if (correct) feedback.push('Riktig!');
+    alert(feedback.join('. '));
+    evaluate(correct);
+  }
+
+  return (
+    <div className="panel" style={{ marginTop: '0.8rem' }}>
+      <h4>Elektrokjemi – {subExperiment === 'galvanic' ? 'Galvanisk celle' : subExperiment === 'electrolysis' ? 'Elektrolyse' : 'Smelte'}</h4>
+      {/* Options vary by subExperiment */}
+      {subExperiment === 'galvanic' && (
+        <>
+          <label>Anode (oksidasjon)
+            <select value={anode} onChange={e => setAnode(e.target.value)}>
+              {metalOptions.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </label>
+          <label>Katode (reduksjon)
+            <select value={cathode} onChange={e => setCathode(e.target.value)}>
+              {metalOptions.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </label>
+          <label>Saltbro
+            <select value={saltBridge} onChange={e => setSaltBridge(e.target.value)}>
+              {saltBridgeOptions.map(sb => <option key={sb} value={sb}>{sb}</option>)}
+            </select>
+          </label>
+          <p>Beregn E° = E°(katode) – E°(anode) = {(E0[cathode] - E0[anode]).toFixed(2)} V</p>
+        </>
+      )}
+      {subExperiment === 'electrolysis' && (
+        <>
+          <label>Anode
+            <select value={anode} onChange={e => setAnode(e.target.value)}>
+              {electrodeOptions.map(el => <option key={el} value={el}>{el}</option>)}
+            </select>
+          </label>
+          <label>Katode
+            <select value={cathode} onChange={e => setCathode(e.target.value)}>
+              {electrodeOptions.map(el => <option key={el} value={el}>{el}</option>)}
+            </select>
+          </label>
+          <label>Elektrolytt
+            <select value={electrolyte} onChange={e => setElectrolyte(e.target.value)}>
+              {electrolyteOptions.filter(opt => opt.endsWith('(aq)')).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </label>
+          <label>Tilsett vann?
+            <input type="checkbox" checked={useWater} onChange={e => setUseWater(e.target.checked)} />
+          </label>
+          <label>Spenning (V)
+            <input type="number" step="0.1" value={voltage} onChange={e => setVoltage(parseFloat(e.target.value) || 0)} />
+          </label>
+          <p>Forventet produkt på katoden: {params.expectedProduct}</p>
+        </>
+      )}
+      {subExperiment === 'molten' && (
+        <>
+          <label>Anode
+            <select value={anode} onChange={e => setAnode(e.target.value)}>
+              {electrodeOptions.map(el => <option key={el} value={el}>{el}</option>)}
+            </select>
+          </label>
+          <label>Katode
+            <select value={cathode} onChange={e => setCathode(e.target.value)}>
+              {electrodeOptions.map(el => <option key={el} value={el}>{el}</option>)}
+            </select>
+          </label>
+          <label>Salt
+            <select value={electrolyte} onChange={e => setElectrolyte(e.target.value)}>
+              {electrolyteOptions.filter(opt => opt.endsWith('(l)')).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </label>
+          <label>Tilsett vann?
+            <input type="checkbox" checked={useWater} onChange={e => setUseWater(e.target.checked)} />
+          </label>
+          <label>Spenning (V)
+            <input type="number" step="0.1" value={voltage} onChange={e => setVoltage(parseFloat(e.target.value) || 0)} />
+          </label>
+          <p>Forventede produkter: Katode → {params.expectedProductCathode}, Anode → {params.expectedProductAnode}</p>
+        </>
+      )}
+      <button className="button-primary" onClick={check} style={{ marginTop: '0.5rem' }}>Kontroller</button>
+    </div>
+  );
+}
+
+// Calorimetry panel with apparatus selection.
+function CalorimetryPanel({ params, evaluate }) {
+  const { correctCalorimeter, requiresThermometer, requiresStirrer, mass, deltaT, Cp, bombConstant } = params;
+  const calorimeterOptions = ['Styrofoam', 'Bomb'];
+  const [calorimeter, setCalorimeter] = useState(correctCalorimeter);
+  const [thermometer, setThermometer] = useState(requiresThermometer);
+  const [stirrer, setStirrer] = useState(requiresStirrer || false);
+  const [m, setM] = useState(mass || 100);
+  const [dT, setDT] = useState(deltaT || 5);
+  function check() {
+    let correct = true;
+    let feedback = [];
+    if (calorimeter !== correctCalorimeter) { correct = false; feedback.push('Feil kalorimeter'); }
+    if (thermometer !== requiresThermometer) { correct = false; feedback.push(requiresThermometer ? 'Termometer må være med' : 'Termometer skal ikke brukes'); }
+    if ((requiresStirrer || false) !== stirrer) { correct = false; feedback.push(requiresStirrer ? 'Omrører må være med' : 'Omrører skal ikke brukes'); }
+    if (correct) feedback.push('Riktig!');
+    alert(feedback.join('. '));
+    evaluate(correct);
+  }
+  // compute heat
+  const heat_kJ = useMemo(() => {
+    if (calorimeter === 'Bomb' && bombConstant) {
+      return bombConstant * dT;
+    }
+    return (m * Cp * dT) / 1000;
+  }, [calorimeter, m, Cp, dT, bombConstant]);
+  return (
+    <div className="panel" style={{ marginTop: '0.8rem' }}>
+      <h4>Kalorimetri</h4>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <label>Kalorimeter
+          <select value={calorimeter} onChange={e => setCalorimeter(e.target.value)}>
+            {calorimeterOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          </select>
+        </label>
+        <label>Termometer?
+          <input type="checkbox" checked={thermometer} onChange={e => setThermometer(e.target.checked)} />
+        </label>
+        <label>Omrører?
+          <input type="checkbox" checked={stirrer} onChange={e => setStirrer(e.target.checked)} />
+        </label>
+        <label>Masse vann (g)
+          <input type="number" step="1" value={m} onChange={e => setM(parseFloat(e.target.value) || 0)} />
+        </label>
+        <label>ΔT (°C)
+          <input type="number" step="0.1" value={dT} onChange={e => setDT(parseFloat(e.target.value) || 0)} />
+        </label>
+      </div>
+      <p>q = {heat_kJ.toFixed(2)} kJ</p>
+      <button className="button-primary" onClick={check}>Kontroller</button>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Main component
+export default function TitrationGame() {
+  // View: 'home' | 'select' | 'exam' | 'results'
+  const [view, setView] = useState('home');
+  const [selectedExperiment, setSelectedExperiment] = useState(null);
+  const [tasks, setTasks] = useState([]);
+  const [taskIndex, setTaskIndex] = useState(0);
+  const [examScore, setExamScore] = useState(0);
+  const [showHint, setShowHint] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
+  const [userInput, setUserInput] = useState('');
+
+  function startExamFor(exp) {
+    // Filter tasks by experiment
+    const filtered = LAB_TASKS.filter(t => t.experiment === exp);
+    setSelectedExperiment(exp);
+    setTasks(filtered);
+    setTaskIndex(0);
+    setExamScore(0);
+    setShowHint(false);
+    setShowSolution(false);
+    setUserInput('');
+    setView('exam');
+  }
+  function submitAnswer() {
+    const task = tasks[taskIndex];
+    let correct = false;
+    if (task.type === 'numeric') {
+      const val = parseFloat(userInput);
+      if (!isNaN(val) && Math.abs(val - task.answer) <= (task.tolerance || 0.05)) correct = true;
+    } else if (task.type === 'mcq') {
+      if (parseInt(userInput, 10) === task.answer) correct = true;
+    }
+    if (correct) setExamScore(prev => prev + 1);
+    if (taskIndex + 1 < tasks.length) {
+      setTaskIndex(prev => prev + 1);
+      setUserInput('');
+      setShowHint(false);
+      setShowSolution(false);
+    } else {
+      setView('results');
+    }
+  }
+  function prevTask() {
+    if (taskIndex > 0) {
+      setTaskIndex(prev => prev - 1);
+      setUserInput('');
+      setShowHint(false);
+      setShowSolution(false);
+    }
+  }
+  function randomTask() {
+    if (tasks.length === 0) return;
+    const idx = Math.floor(Math.random() * tasks.length);
+    setTaskIndex(idx);
+    setUserInput('');
+    setShowHint(false);
+    setShowSolution(false);
+  }
+  function resetExam() {
+    setView('select');
+    setSelectedExperiment(null);
+    setTasks([]);
+    setTaskIndex(0);
+    setExamScore(0);
+    setShowHint(false);
+    setShowSolution(false);
+    setUserInput('');
+  }
+
+  const HomeView = () => (
+    <div style={{ textAlign: 'center' }}>
+      <h2>Velkommen til SiU Magisk KjemiLab</h2>
+      <p>Øv på praktiske laboratorieoppgaver fra Kjemi 2. Velg en eksperimenttype for å starte.</p>
+      <button className="button-primary" onClick={() => setView('select')} style={{ margin: '0.5rem', padding: '0.8rem 1.2rem' }}>Start eksamen</button>
+      <button className="button-secondary" onClick={() => startExamFor('titration')} style={{ margin: '0.5rem', padding: '0.8rem 1.2rem' }}>Utforsk titrering</button>
+    </div>
+  );
+  const SelectView = () => (
+    <div>
+      <h3>Velg eksperimenttype</h3>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+        {EXPERIMENT_TYPES.map(et => (
+          <div key={et.key} className="panel" style={{ flex: '1 1 45%', cursor: 'pointer' }} onClick={() => startExamFor(et.key)}>
+            <h4>{et.name}</h4>
+            {et.key === 'electrochem' && <p style={{ fontSize: '0.9rem' }}>Inneholder galvanisk celle, elektrolyse og smelte.</p>}
+            {et.key === 'titration' && <p style={{ fontSize: '0.9rem' }}>Syre–base titrering med pH‑kurve og indikatorer.</p>}
+            {et.key === 'precipitation' && <p style={{ fontSize: '0.9rem' }}>Bland salter og se om bunnfall dannes.</p>}
+            {et.key === 'calorimetry' && <p style={{ fontSize: '0.9rem' }}>Mål varmeendringer i reaksjoner.</p>}
+          </div>
+        ))}
+      </div>
+      <button className="button-secondary" onClick={() => setView('home')} style={{ marginTop: '1rem' }}>Tilbake</button>
+    </div>
+  );
   const ExamView = () => {
     const task = tasks[taskIndex];
+    // function to handle evaluation of interactive tasks
+    function handleInteractive(correct) {
+      if (correct) setExamScore(prev => prev + 1);
+      if (taskIndex + 1 < tasks.length) {
+        setTaskIndex(prev => prev + 1);
+        setShowHint(false);
+        setShowSolution(false);
+        setUserInput('');
+      } else {
+        setView('results');
+      }
+    }
     return (
       <div>
         <h3 style={{ marginBottom: '0.5rem' }}>Oppgave {taskIndex + 1} av {tasks.length}</h3>
         <p style={{ whiteSpace: 'pre-wrap' }}>{task.question}</p>
-        {/* Answer input */}
         {task.type === 'numeric' && (
           <input type="number" value={userInput} onChange={e => setUserInput(e.target.value)} style={{ width: '100%', padding: '0.4rem', marginTop: '0.5rem' }} />
         )}
         {task.type === 'mcq' && (
           <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-            {task.options.map((opt, idx) => (
+            {task.choices.map((opt, idx) => (
               <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <input type="radio" name="mcq" value={idx} checked={userInput === String(idx)} onChange={e => setUserInput(e.target.value)} /> {opt}
               </label>
             ))}
           </div>
         )}
-        {task.type === 'titration' && (
-          <div style={{ fontSize: '13px', marginTop: '0.5rem' }}>
-            <p>Still inn syre, base, konsentrasjoner, syrevolum, indikator og titrer til ekvivalens. Trykk deretter «Kontroller» for å sjekke.</p>
-          </div>
-        )}
-        {/* Hint and solution toggles */}
+        {task.type === 'interactive' && task.experiment !== 'titration' && (<p style={{ fontSize: '13px', marginTop: '0.5rem' }}>Utfør eksperimentet ved hjelp av panelet under og klikk «Kontroller» når du er ferdig.</p>)}
         {showHint && <p style={{ marginTop: '0.5rem', fontStyle: 'italic', color: '#7058a5' }}><strong>Hint:</strong> {task.hint}</p>}
         {showSolution && <p style={{ marginTop: '0.5rem', fontSize: '13px', whiteSpace: 'pre-wrap' }}><strong>Fasit:</strong> {task.solution}</p>}
-        {/* Navigation buttons */}
         <div style={{ marginTop: '0.8rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-          {task.type === 'titration' && <button className="button-primary" onClick={() => {
-            const result = evaluateTitrationTask(task);
-            alert(result.feedback);
-          }}>Kontroller</button>}
-          <button className="button-primary" onClick={submitAnswer}>{taskIndex + 1 === tasks.length ? 'Fullfør' : 'Neste'}</button>
+          {task.type === 'numeric' || task.type === 'mcq' ? (
+            <button className="button-primary" onClick={submitAnswer}>{taskIndex + 1 === tasks.length ? 'Fullfør' : 'Neste'}</button>
+          ) : null}
           <button className="button-secondary" onClick={prevTask} disabled={taskIndex === 0}>Forrige</button>
           <button className="button-secondary" onClick={randomTask}>Tilfeldig</button>
-          <button className="button-secondary" onClick={() => setShowHint(prev => !prev)}>{showHint ? 'Skjul hint' : 'Vis hint'}</button>
+          <button className="button-secondary" onClick={() => setShowHint(prev => !prev)}>{showHint ? 'Skjul hint' : 'Hint'}</button>
           <button className="button-secondary" onClick={() => setShowSolution(prev => !prev)}>{showSolution ? 'Skjul fasit' : 'Fasit'}</button>
           <button className="button-secondary" onClick={resetExam}>Tilbake</button>
         </div>
         <p style={{ marginTop: '0.5rem' }}>Poeng: {examScore}</p>
-        {/* Interactive panel for the current task */}
-        {task.experiment === 'titration' && <TitrationPanel />}
-        {task.experiment === 'precipitation' && <PrecipitationPanel task={task} />}
-        {task.experiment === 'galvanic' && <GalvanicPanel task={task} />}
-        {task.experiment === 'electrolysis' && <ElectrolysisPanel task={task} />}
-        {task.experiment === 'calorimetry' && <CalorimetryPanel task={task} />}
+        {/* Show interactive panels based on experiment and subExperiment */}
+        {task.experiment === 'titration' && <TitrationPanel params={task.params} evaluate={handleInteractive} />}
+        {task.experiment === 'precipitation' && <PrecipitationPanel params={task.params} evaluate={handleInteractive} />}
+        {task.experiment === 'electrochem' && (
+          <ElectrochemPanel params={task.params} subExperiment={task.subExperiment} evaluate={handleInteractive} />
+        )}
+        {task.experiment === 'calorimetry' && <CalorimetryPanel params={task.params} evaluate={handleInteractive} />}
       </div>
     );
   };
-
-  // Results view: shows score and offers restart
   const ResultsView = () => (
     <div style={{ textAlign: 'center' }}>
       <h3>Eksamen ferdig</h3>
       <p>Du fikk {examScore} av {tasks.length} riktige.</p>
-      <button className="button-primary" onClick={() => startExamFor(selectedExperiment)}>Prøv samme eksperiment igjen</button>
-      <button className="button-secondary" onClick={resetExam} style={{ marginLeft: '0.5rem' }}>Velg nytt eksperiment</button>
-      <button className="button-secondary" onClick={() => setView('home')} style={{ marginLeft: '0.5rem' }}>Hjem</button>
+      <button className="button-primary" onClick={() => startExamFor(selectedExperiment)} style={{ margin: '0.5rem' }}>Prøv samme eksperiment igjen</button>
+      <button className="button-secondary" onClick={resetExam} style={{ margin: '0.5rem' }}>Velg nytt eksperiment</button>
+      <button className="button-secondary" onClick={() => setView('home')} style={{ margin: '0.5rem' }}>Hjem</button>
     </div>
   );
-
   return (
     <div style={{ minHeight: '100vh', background: 'radial-gradient(circle at 50% 20%, #f7faff, #e6f0ff)', padding: '2rem' }}>
-      <div className="container" style={{ maxWidth: '1100px', margin: '0 auto', background: 'rgba(255,255,255,0.88)', padding: '2rem', borderRadius: '14px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-        <h1 style={{ textAlign: 'center', marginBottom: '1.5rem', fontSize: '2rem', color: '#1c2e8c' }}>SiU Lab – Magisk KjemiLab (Steg 5)</h1>
+      <div className="container" style={{ maxWidth: '1100px', margin: '0 auto', background: 'rgba(255,255,255,0.90)', padding: '2rem', borderRadius: '14px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+        <h1 style={{ textAlign: 'center', marginBottom: '1.5rem', fontSize: '2rem', color: '#1c2e8c' }}>SiU Lab – Magisk KjemiLab (Steg 6)</h1>
         {view === 'home' && <HomeView />}
-        {view === 'select' && <SelectExperimentView />}
+        {view === 'select' && <SelectView />}
         {view === 'exam' && <ExamView />}
         {view === 'results' && <ResultsView />}
       </div>
