@@ -1,745 +1,668 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
-// Data for acids, bases, and indicators (monoprotic simplification)
-const ACIDS = {
-  HCl: { name: 'HCl (saltsyre)', Ka: Infinity, strong: true, info: 'Sterk syre (full protolyse).', color: '#3461FF' },
-  HNO3: { name: 'HNO₃ (salpetersyre)', Ka: Infinity, strong: true, info: 'Sterk syre brukt i analyse.', color: '#2B7DFB' },
-  CH3COOH: { name: 'CH₃COOH (eddiksyre)', Ka: 1.8e-5, strong: false, info: 'Svak syre brukt i buffere.', color: '#9EC5FF' },
-  HCOOH: { name: 'HCOOH (maursyre)', Ka: 1.77e-4, strong: false, info: 'Svak syre, litt sterkere enn eddiksyre.', color: '#7FB0FF' },
-  HCN: { name: 'HCN (blåsyre)', Ka: 4.9e-10, strong: false, info: 'Meget svak syre (giftig; kun teoretisk her).', color: '#B0C8FF' },
-};
+// ---------------------------------------------------------------------------
+// Exam task definitions for Kjemi 2.
+//
+// Each task covers a different competency from the Kjemi 2 curriculum.
+// These tasks are varied to test buffer calculations, reaction types,
+// electrochemistry and catalysis.  Each entry provides a question, the
+// correct answer, an optional tolerance for numeric questions, multiple‑choice
+// options, a hint, and an explanation displayed after the exam.
+const examTasks = [
+  {
+    question:
+      'Beregn pH til en buffer som inneholder 0,10 M eddiksyre (CH₃COOH) og 0,10 M natriumacetat. (pKa(eddiksyre) ≈ 4,76)',
+    type: 'numeric',
+    answer: 4.76,
+    tolerance: 0.1,
+    hint:
+      'Bruk Henderson–Hasselbalch-formelen: pH = pKa + log([A⁻]/[HA]). Når konsentrasjonene er like, er log-delen 0.',
+    explanation:
+      'Eddiksyre har pKa ≈ 4,76. Bufferen har [A⁻] = [HA], så pH ≈ pKa = 4,76.',
+  },
+  {
+    question:
+      'Hvilken reaksjonstype beskriver følgende prosess: CH₂=CH₂ + H₂ → CH₃–CH₃?',
+    type: 'mcq',
+    options: ['Addisjon', 'Eliminering', 'Substitusjon', 'Kondensasjon'],
+    answer: 0,
+    hint:
+      'Reaktantene går fra to molekyler til ett produkt uten å miste noen atomer.',
+    explanation:
+      'Hydrogen legger seg på etene slik at bindingen brytes og etan dannes. Dette er en addisjonsreaksjon.',
+  },
+  {
+    question:
+      'Hva er den omtrentlige standard cellespenningen for galvanisk cellen Zn/Zn²⁺(aq) || Cu²⁺(aq)/Cu?',
+    type: 'mcq',
+    options: ['1,10 V', '0,76 V', '0,34 V', '0,42 V'],
+    answer: 0,
+    hint:
+      'Cellepotensialet E° = E°(katode) – E°(anode). Zn²⁺/Zn har E° ≈ –0,76 V og Cu²⁺/Cu har E° ≈ +0,34 V.',
+    explanation:
+      'E°cell ≈ 0,34 V – (–0,76 V) = 1,10 V.',
+  },
+  {
+    question:
+      'Hva er riktig beskrivelse av en katalysators rolle i en kjemisk reaksjon?',
+    type: 'mcq',
+    options: [
+      'Den øker aktiveringsenergien',
+      'Den senker aktiveringsenergien og forbrukes',
+      'Den senker aktiveringsenergien og forbrukes ikke',
+      'Den endrer likevektskonstanten',
+    ],
+    answer: 2,
+    hint:
+      'Katalysatorer påvirker reaksjonshastighet ved å åpne en ny reaksjonsvei.',
+    explanation:
+      'Katalysatorer senker aktiveringsenergien uten å bli brukt opp, og påvirker ikke likevektskonstanten.',
+  },
+];
 
-const BASES = {
-  NaOH: { name: 'NaOH (natriumhydroksid)', Kb: Infinity, strong: true, info: 'Sterk base, full protolyse.', color: '#00C2D7' },
-  KOH:  { name: 'KOH (kaliumhydroksid)', Kb: Infinity, strong: true, info: 'Sterk base tilsvarende NaOH.', color: '#00D1E0' },
-  NH3:  { name: 'NH₃ (ammoniakk)', Kb: 1.8e-5, strong: false, info: 'Svak base, danner NH₄⁺ i vann.', color: '#28D8C5' },
-  CH3NH2: { name: 'CH₃NH₂ (metylamin)', Kb: 4.4e-4, strong: false, info: 'Aminbase, sterkere enn NH₃.', color: '#53E3C1' },
-};
+/*
+ * TitrationGame.jsx
+ *
+ * This component implements a full-featured acid–base titration simulator
+ * tailored for SiU Lab. It supports weak/strong acids and bases, shows a
+ * realtime pH vs volume curve, animates lab glassware, and provides
+ * difficulty modes so that both novices and advanced students are
+ * challenged.  The design draws inspiration from Kurzgesagt and
+ * siuskole.no while remaining original and playful.  No external assets
+ * are required; the visuals are rendered via SVG and CSS.
+ */
 
-const INDICATORS = {
-  Phenolphthalein: {
-    name: 'Fenolftalein',
+// Define the available acids.  Each acid has a name, a label for the UI,
+// its type (strong or weak), and, for weak acids, a pKa value.  The
+// logarithmic pKa values are used to compute equilibrium pH in buffer
+// regions and at the equivalence point.  Strong acids omit pKa because
+// they fully dissociate.
+const acids = [
+  { name: 'HCl', label: 'HCl (sterk syre)', type: 'strong' },
+  { name: 'HNO3', label: 'HNO₃ (sterk syre)', type: 'strong' },
+  { name: 'CH3COOH', label: 'CH₃COOH (svak syre)', type: 'weak', pKa: 4.76 },
+  { name: 'HCN', label: 'HCN (svak syre)', type: 'weak', pKa: 9.21 },
+];
+
+// Define the available bases.  Each base has a similar structure.  For
+// weak bases, pKb is provided to compute pH at equivalence and after
+// neutralisation.  Strong bases omit pKb because they fully dissociate.
+const bases = [
+  { name: 'NaOH', label: 'NaOH (sterk base)', type: 'strong' },
+  { name: 'KOH', label: 'KOH (sterk base)', type: 'strong' },
+  { name: 'NH3', label: 'NH₃ (svak base)', type: 'weak', pKb: 4.76 },
+];
+
+// Define indicator options with their colour change ranges and start/end
+// colours.  Colours are specified in hex triplets; interpolation is
+// performed in RGB space.
+const indicators = [
+  {
+    name: 'Phenolphthalein',
     range: [8.2, 10.0],
-    colours: ['#FFFFFF','#E83E8C'],
-    use: 'Sterk syre ↔ sterk base (sluttpunkt) eller svak syre ↔ sterk base (etter ekvivalens).'
+    colours: ['#ffffff', '#e75480'], // colourless to pink
   },
-  MethylOrange: {
-    name: 'Metyloransje',
+  {
+    name: 'Methyl Orange',
     range: [3.1, 4.4],
-    colours: ['#E74C3C','#F1C40F'],
-    use: 'Sterk syre ↔ sterk base (begynn) eller sterk syre ↔ svak base.'
+    colours: ['#d73027', '#fee08b'], // red to yellow
   },
-  BromothymolBlue: {
-    name: 'Bromtymolblått',
+  {
+    name: 'Bromothymol Blue',
     range: [6.0, 7.6],
-    colours: ['#F4D03F','#3498DB'],
-    use: 'Når ekvivalens ligger nær nøytral pH (sterk/sterk).'
+    colours: ['#ffff66', '#2c7bb6'], // yellow to blue
   },
-  MethylRed: {
-    name: 'Metylrødt',
-    range: [4.2, 6.3],
-    colours: ['#FF6B6B','#F9D56E'],
-    use: 'Mellomsterke systemer (svak syre ↔ sterk base før ekvivalens).'
-  },
-  Litmus: {
-    name: 'Lakmus',
-    range: [4.5,8.3],
-    colours: ['#D63031','#0984E3'],
-    use: 'Grovindikator rundt nøytralområdet.'
-  }
-};
+];
 
-// Helper functions
-function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
-function log10(x) { return Math.log(x) / Math.log(10); }
-function interpolateColour(a,b,t) {
-  const ah = parseInt(a.replace('#',''), 16);
-  const ar=(ah>>16)&0xFF, ag=(ah>>8)&0xFF, ab=ah&0xFF;
-  const bh = parseInt(b.replace('#',''), 16);
-  const br=(bh>>16)&0xFF, bg=(bh>>8)&0xFF, bb=bh&0xFF;
-  const rr=Math.round(ar+(br-ar)*t);
-  const gg=Math.round(ag+(bg-ag)*t);
-  const bb2=Math.round(ab+(bb-ab)*t);
-  return '#' + ((rr<<16)|(gg<<8)|bb2).toString(16).padStart(6,'0');
+const pKw = 14.0;
+
+// Utility: base-10 logarithm.  JavaScript lacks a built‑in log10, so
+// compute via natural log.
+function log10(x) {
+  return Math.log(x) / Math.LN10;
 }
 
-function pHColour(pH) {
-  const t = clamp(pH/14, 0, 1);
-  return t < 0.5
-    ? interpolateColour('#2B7DFB','#5AD49E', t/0.5)
-    : interpolateColour('#5AD49E','#E83E8C', (t-0.5)/0.5);
+// Interpolate between two hex colours.  Given two colour strings like
+// '#ff0000' and '#00ff00' and a fraction t between 0 and 1, return an
+// intermediate colour.  This helper is used to animate the indicator
+// colour as pH passes through the indicator's transition range.
+function interpolateColour(hex1, hex2, t) {
+  const c1 = hex1.replace('#', '');
+  const c2 = hex2.replace('#', '');
+  const r1 = parseInt(c1.substring(0, 2), 16);
+  const g1 = parseInt(c1.substring(2, 4), 16);
+  const b1 = parseInt(c1.substring(4, 6), 16);
+  const r2 = parseInt(c2.substring(0, 2), 16);
+  const g2 = parseInt(c2.substring(2, 4), 16);
+  const b2 = parseInt(c2.substring(4, 6), 16);
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const b = Math.round(b1 + (b2 - b1) * t);
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
 }
 
-// Compute pH for titration (monoprotic)
-function computePH(acid, base, Ca, Cb, Va, Vb) {
-  const nA = Ca * Va;
-  const nB = Cb * Vb;
-  const Vt = Va + Vb;
-  if (Vt <= 0) return 7;
-  // strong/strong
-  if (acid.Ka === Infinity && base.Kb === Infinity) {
-    const diff = nA - nB;
-    if (Math.abs(diff) < 1e-12) return 7;
-    if (diff > 0) return -log10(diff / Vt);
-    return 14 + log10((-diff) / Vt);
-  }
-  // weak acid + strong base
-  if (acid.Ka !== Infinity && base.Kb === Infinity) {
-    const Ka = acid.Ka;
-    if (nB < nA) {
-      const nHA = nA - nB;
-      const nAminus = nB;
-      return -log10(Ka) + Math.log10(nAminus / nHA);
+/**
+ * Compute the pH of the solution after adding Vb litres of base to
+ * an initial volume Va of acid.  Ca and Cb are molar concentrations.
+ * The calculation accounts for combinations of strong/weak acids and
+ * bases using common approximations appropriate for introductory
+ * titration curves.  The returned value is bounded between 0 and 14.
+ */
+function computePH(acid, base, Ca, Va, Cb, Vb) {
+  const mAcid0 = Ca * Va; // initial moles of acid
+  const mBase = Cb * Vb; // moles of base added
+  const Vtot = Va + Vb;
+  // guard against zero volume
+  if (Vtot === 0) return 7;
+
+  // Case 1: strong acid + strong base
+  if (acid.type === 'strong' && base.type === 'strong') {
+    if (mBase < mAcid0) {
+      const h = (mAcid0 - mBase) / Vtot;
+      return Math.max(0, Math.min(14, -log10(h)));
+    } else if (mBase > mAcid0) {
+      const oh = (mBase - mAcid0) / Vtot;
+      const pH = pKw + log10(oh);
+      return Math.max(0, Math.min(14, pH));
+    } else {
+      return 7.0;
     }
-    if (Math.abs(nB - nA) < 1e-12) {
-      const Kb = 1e-14 / Ka;
-      const Csalt = nA / Vt;
-      const OH = Math.sqrt(Kb * Csalt);
-      return 14 + log10(OH);
-    }
-    return 14 + log10((nB - nA) / Vt);
   }
-  // strong acid + weak base
-  if (acid.Ka === Infinity && base.Kb !== Infinity) {
-    const Kb = base.Kb;
-    if (nA < nB) {
-      const nBfree = nB - nA;
-      const nBHplus = nA;
-      return 14 - ( -log10(Kb) + Math.log10(nBHplus / nBfree) );
+
+  // Case 2: weak acid + strong base
+  if (acid.type === 'weak' && base.type === 'strong') {
+    const Ka = Math.pow(10, -acid.pKa);
+    if (Vb === 0) {
+      // initial weak acid
+      // pH ≈ 0.5 * (pKa - log10(Ca))
+      const ph = 0.5 * (acid.pKa - log10(Ca));
+      return Math.max(0, Math.min(14, ph));
     }
-    if (Math.abs(nA - nB) < 1e-12) {
-      const Ka = 1e-14 / Kb;
-      const Csalt = nB / Vt;
-      const H = Math.sqrt(Ka * Csalt);
-      return -log10(H);
+    if (mBase < mAcid0) {
+      // buffer region: Henderson–Hasselbalch
+      const ratio = mBase / (mAcid0 - mBase);
+      const ph = acid.pKa + log10(ratio);
+      return Math.max(0, Math.min(14, ph));
+    } else if (mBase > mAcid0) {
+      // past equivalence: strong base dominates
+      const oh = (mBase - mAcid0) / Vtot;
+      const ph = pKw + log10(oh);
+      return Math.max(0, Math.min(14, ph));
+    } else {
+      // at equivalence: solution of the salt of weak acid
+      const Csalt = mAcid0 / Vtot;
+      const ph = 0.5 * (pKw + acid.pKa + log10(Csalt));
+      return Math.max(0, Math.min(14, ph));
     }
-    return -log10((nA - nB) / Vt);
   }
-  // weak/weak (approx)
-  const pKa = -log10(acid.Ka);
-  const pKb = -log10(base.Kb);
-  if (Math.abs(nA - nB) < 1e-12) return 7 + 0.5 * (pKa - pKb);
-  if (nB < nA) return -log10(acid.Ka) + Math.log10(nB / (nA - nB));
-  return 14 - ( -log10(base.Kb) + Math.log10(nA / (nB - nA)) );
-}
 
-// Standard potentials for E° tasks
-const E0 = {
-  'Cu2+/Cu': 0.34,
-  'Zn2+/Zn': -0.76,
-  'Ag+/Ag': 0.80,
-  'Fe3+/Fe2+': 0.77,
-  'Cl2/Cl-': 1.36,
-  'H+/H2': 0.00,
-};
-
-// Solubility products for precipitation
-const KSP = {
-  'AgCl': 1.8e-10,
-  'BaSO4': 1.1e-10,
-  'CaF2': 3.9e-11,
-};
-
-// Helper for numeric formatting
-function numFmt(x, d = 2) {
-  return parseFloat(x.toFixed(d));
-}
-
-// Task generators
-function t_buffer_basic() {
-  const pKas = [3.75, 4.76, 5.0];
-  const pKa = pKas[Math.floor(Math.random() * pKas.length)];
-  const Ca = numFmt(0.05 + Math.random() * 0.45, 2);
-  const ratio = 0.5 + Math.random() * 1.5;
-  const Cb = numFmt(Ca * ratio, 2);
-  const pH = pKa + log10(Cb / Ca);
-  return {
-    question: `En buffer lages av en svak syre med pKₐ = ${pKa.toFixed(2)} og dens konjugerte base.
-Konsentrasjonene er [syre] = ${Ca.toFixed(2)} M og [base] = ${Cb.toFixed(2)} M. Hva er pH?`,
-    type: 'numeric',
-    answer: numFmt(pH, 2),
-    tolerance: 0.1,
-    hint: 'Bruk Henderson–Hasselbalch: pH = pKₐ + log([base]/[syre]).',
-    explanation: `pH = pKₐ + log([base]/[syre]) = ${pKa.toFixed(2)} + log(${(Cb/Ca).toFixed(2)}) ≈ ${numFmt(pH,2)}.`,
-  };
-}
-
-function t_titration_weak_strong() {
-  const pKa = 4.76;
-  const Ca = numFmt(0.05 + Math.random()*0.10, 2);
-  const Va = numFmt(0.015 + Math.random()*0.02, 3);
-  const Cb = numFmt(0.05 + Math.random()*0.10, 2);
-  const nA = Ca * Va;
-  const Veq = nA / Cb;
-  const Vb = numFmt(Math.max(0.001, Math.min(Veq * (0.2 + Math.random()*1.6), 2*Veq)), 3);
-  const pHval = computePH({Ka: Math.pow(10,-pKa)}, {Kb: Infinity}, Ca, Cb, Va, Vb);
-  return {
-    question: `En svak syre (pKₐ = ${pKa}) med konsentrasjon ${Ca} M og volum ${Va} L titreres med ${Cb} M NaOH.
-Hva blir pH etter at ${Vb} L base er tilsatt?`,
-    type: 'numeric',
-    answer: numFmt(pHval, 2),
-    tolerance: 0.1,
-    hint: 'Bestem om vi er før, ved eller etter ekvivalens; bruk buffer- eller overskuddsformel.',
-    explanation: `n(HA) = ${numFmt(nA,3)} mol, n(OH⁻) = ${(Cb*Vb).toFixed(3)} mol, totalvolum = ${(Va+Vb).toFixed(3)} L. Basert på regionen finner man pH ≈ ${numFmt(pHval,2)}.`,
-  };
-}
-
-function t_precipitation() {
-  const salts = Object.keys(KSP);
-  const salt = salts[Math.floor(Math.random()*salts.length)];
-  const ksp = KSP[salt];
-  const C1 = numFmt(0.02 + Math.random()*0.13, 2);
-  const C2 = numFmt(0.02 + Math.random()*0.13, 2);
-  const V1 = numFmt(0.04 + Math.random()*0.06, 3);
-  const V2 = numFmt(0.04 + Math.random()*0.06, 3);
-  const Ct1 = (C1 * V1)/(V1+V2);
-  const Ct2 = (C2 * V2)/(V1+V2);
-  const Q = Ct1 * Ct2;
-  const will = Q > ksp;
-  return {
-    question: `Blander du ${V1} L av ${C1} M og ${V2} L av ${C2} M av løsninger som danner ${salt}. Vil ${salt} felles ut? (K_sp = ${ksp.toExponential()})`,
-    type: 'mcq',
-    options: ['Ja, bunnfall dannes','Nei, ingen bunnfall'],
-    answer: will ? 'Ja, bunnfall dannes' : 'Nei, ingen bunnfall',
-    hint: 'Beregn ionekonsentrasjoner etter fortynning og sammenlign Q med Ksp.',
-    explanation: `Etter fortynning: [ion1] = ${numFmt(Ct1,3)} M, [ion2] = ${numFmt(Ct2,3)} M. Q = ${numFmt(Q,3)}. siden Q ${will?'>':'<='} K_sp (${ksp.toExponential()}), ${will?'dannes bunnfall':'dannes ikke bunnfall'}.`,
-  };
-}
-
-function t_cell_potential() {
-  const pairs = Object.keys(E0);
-  const p1 = pairs[Math.floor(Math.random()*pairs.length)];
-  let p2 = pairs[Math.floor(Math.random()*pairs.length)];
-  while (p2 === p1) p2 = pairs[Math.floor(Math.random()*pairs.length)];
-  const E = E0[p1] - E0[p2];
-  return {
-    question: `Beregn standard cellepotensial for galvanisk celle: (${p2}) || (${p1}).`,
-    type: 'numeric',
-    answer: numFmt(E, 2),
-    tolerance: 0.05,
-    hint: 'E°_celle = E°_katode − E°_anode; den mest positive er katode.',
-    explanation: `E°(katode) = E°(${p1}) = ${E0[p1]} V, E°(anode) = E°(${p2}) = ${E0[p2]} V. E°_celle = ${numFmt(E,2)} V.`,
-  };
-}
-
-function t_arrhenius() {
-  const k1 = numFmt(0.003 + Math.random()*0.017,3);
-  const factor = 2 + Math.random()*4;
-  const k2 = numFmt(k1 * factor, 3);
-  const T1 = Math.floor(293 + Math.random()*12);
-  const T2 = T1 + Math.floor(10 + Math.random()*15);
-  const R = 8.314;
-  const Ea = (R * Math.log(k2/k1) / (1/T1 - 1/T2)) / 1000;
-  return {
-    question: `For en reaksjon er k₁ = ${k1} s⁻¹ ved T₁ = ${T1} K og k₂ = ${k2} s⁻¹ ved T₂ = ${T2} K. Hva er aktiveringsenergien Eₐ (kJ/mol)?`,
-    type: 'numeric',
-    answer: numFmt(Ea, 2),
-    tolerance: 0.5,
-    hint: 'Bruk ln(k₂/k₁) = Eₐ/R · (1/T₁ − 1/T₂).',
-    explanation: `ln(k₂/k₁) = ln(${numFmt(k2/k1,3)}) og 1/T₁ − 1/T₂ = ${(1/T1 - 1/T2).toFixed(5)}. Eₐ = R·ln(k₂/k₁)/(1/T₁−1/T₂) ≈ ${numFmt(Ea,2)} kJ/mol.`,
-  };
-}
-
-function t_calorimetry() {
-  const m = Math.floor(50 + Math.random()*100);
-  const dT = numFmt(3 + Math.random()*5, 1);
-  const C = 4.18;
-  const q = (m * C * dT) / 1000;
-  return {
-    question: `I et kalorimeter varmes ${m} g vann opp ${dT} K. Hva er reaksjonsvarmen (kJ) som overføres til vannet? (C=4,18 J/(g·K))`,
-    type: 'numeric',
-    answer: numFmt(q, 2),
-    tolerance: 0.3,
-    hint: 'q = m · C · ΔT, del på 1000 for kJ.',
-    explanation: `q = m·C·ΔT = ${m} g × 4,18 J/(g·K) × ${dT} K = ${(m*4.18*dT).toFixed(0)} J = ${numFmt(q,2)} kJ.`,
-  };
-}
-
-function t_equilibrium() {
-  const K = numFmt(2 + Math.random()*23, 1);
-  const C0 = numFmt(0.2 + Math.random()*0.8, 2);
-  const x = (K * C0) / (1 + K);
-  return {
-    question: `For likevekten A ⇌ B er K = ${K}. Start med [A]₀ = ${C0} M og [B]₀ = 0. Beregn [B] ved likevekt (M).`,
-    type: 'numeric',
-    answer: numFmt(x, 3),
-    tolerance: 0.01,
-    hint: 'Sett opp ICE-tabell og løsningsformel x = K·C₀/(1+K).',
-    explanation: `x = K·C₀/(1+K) = ${numFmt(x,3)} M.`,
-  };
-}
-
-function t_electrolysis() {
-  const I = numFmt(0.5 + Math.random()*2.5, 2);
-  const t = Math.floor(600 + Math.random()*3000);
-  const z = 2;
-  const M = 63.546;
-  const F = 96485;
-  const m = (I * t / (z * F)) * M;
-  return {
-    question: `Under elektrolyse av Cu²⁺-løsning kjøres en strøm på ${I} A i ${t} s. Hvor mange gram Cu avsettes?`,
-    type: 'numeric',
-    answer: numFmt(m, 3),
-    tolerance: 0.02,
-    hint: 'm = (I·t)/(zF) · M (Faradays lov).',
-    explanation: `Mol e⁻ = I·t/F = ${(I*t/F).toFixed(4)}, mol Cu = ${(I*t/(z*F)).toFixed(4)}. Masse = mol·M = ${numFmt(m,3)} g.`,
-  };
-}
-
-// MCQ categories
-function t_organic_mcq() {
-  const qList = [
-    {
-      q: 'Hva er produktet av oksidasjon av en primær alkohol?',
-      opts: ['Aldehyd','Keton','Karboksylsyre','Eter'],
-      ans: 'Aldehyd',
-      exp: 'Primære alkoholer oksideres først til aldehyder og videre til karboksylsyrer.',
-    },
-    {
-      q: 'Hva kalles CH₃–CH₂–O–CH₂–CH₃?',
-      opts: ['Dietyleter','Metyletylketon','Etylacetat','Propanal'],
-      ans: 'Dietyleter',
-      exp: 'Et oksygen binder to etylgrupper; dette er dietyleter.',
-    },
-    {
-      q: 'Hva er produktet av hydrogenering av en alkyn?',
-      opts: ['Alken','Alkan','Aromatisk forbindelse','Keton'],
-      ans: 'Alkan',
-      exp: 'Alkyner hydrogeneres først til alken og videre til alkan med nok H₂.',
-    },
-    {
-      q: 'Hva er IUPAC-navnet for CH₃-CH(CH₃)-CH₂-COOH?',
-      opts: ['2-metylpropanol','2-metylpropansyre','butansyre','3-metylpropansyre'],
-      ans: '2-metylpropansyre',
-      exp: 'Syren har fire karboner og en metyl på karbon 2; navnet er 2-metylpropansyre.',
-    },
-  ];
-  const item = qList[Math.floor(Math.random()*qList.length)];
-  return {
-    question: item.q,
-    type: 'mcq',
-    options: item.opts,
-    answer: item.ans,
-    hint: 'Tenk på antall karboner og funksjonelle grupper.',
-    explanation: item.exp,
-  };
-}
-
-function t_ir_mcq() {
-  const qList = [
-    {
-      q: 'Hvilket IR-bånd er typisk for en alkohol O–H strekk?',
-      opts: ['~3300 cm⁻¹ (bred)','~1715 cm⁻¹','~2100 cm⁻¹','~1550 cm⁻¹'],
-      ans: '~3300 cm⁻¹ (bred)',
-      exp: 'En bred topp rundt 3200–3600 cm⁻¹ er karakteristisk for O–H strekk i alkoholer.',
-    },
-    {
-      q: 'Hvilket område viser et sterkt C≡N-bånd?',
-      opts: ['~2200–2300 cm⁻¹','~1600 cm⁻¹','~3000 cm⁻¹','~1000 cm⁻¹'],
-      ans: '~2200–2300 cm⁻¹',
-      exp: 'Nitrilgruppe (C≡N) gir skarpt bånd rundt 2250 cm⁻¹.',
-    },
-    {
-      q: 'Hvor finner du karbonylbåndet i estere?',
-      opts: ['~1735 cm⁻¹','~1650 cm⁻¹','~2300 cm⁻¹','~3200 cm⁻¹'],
-      ans: '~1735 cm⁻¹',
-      exp: 'Estere har karbonylbånd litt høyere enn ketoner/syrer, typisk 1735 cm⁻¹.',
-    },
-  ];
-  const item = qList[Math.floor(Math.random()*qList.length)];
-  return {
-    question: item.q,
-    type: 'mcq',
-    options: item.opts,
-    answer: item.ans,
-    hint: 'Husk karakteristiske IR frekvenser for funksjonelle grupper.',
-    explanation: item.exp,
-  };
-}
-
-function t_naming_mcq() {
-  const qList = [
-    {
-      q: 'Hva er navnet på CH₃–CH₂–CH₂–CH₂–OH?',
-      opts: ['Propanol','Butanol','Pentan','Metanol'],
-      ans: 'Butanol',
-      exp: 'Fire karboner og en alkoholgruppe → 1-butanol.',
-    },
-    {
-      q: 'Hva er IUPAC-navnet for CH₃–CH₂–CH₂–NH₂?',
-      opts: ['Metanol','Etanol','Propanal','Propan-1-amin'],
-      ans: 'Propan-1-amin',
-      exp: 'Amin med tre karboner på karbon 1: propan-1-amin.',
-    },
-    {
-      q: 'Hva kalles CH₃–CH₂–COOCH₃?',
-      opts: ['Etylmetanavat','Metyletylketon','Metylpropionat','Etylacetat'],
-      ans: 'Metylpropionat',
-      exp: 'Ester: syre fra propansyre, alkohol fra metanol: metylpropionat.',
-    },
-  ];
-  const item = qList[Math.floor(Math.random()*qList.length)];
-  return {
-    question: item.q,
-    type: 'mcq',
-    options: item.opts,
-    answer: item.ans,
-    hint: 'Identifiser antall karboner og funksjonelle grupper.',
-    explanation: item.exp,
-  };
-}
-
-function t_chromatography_mcq() {
-  const qList = [
-    {
-      q: 'Hva beskriver R_f i tynnsjiktskromatografi?',
-      opts: ['Avstand stoffet har vandret','Forholdet mellom avstand stoffet og front','Polariteten til løsemidlet','Konsentrasjonen av analytten'],
-      ans: 'Forholdet mellom avstand stoffet og front',
-      exp: 'R_f = (avstand analytt)/(avstand løsemiddelfront).',
-    },
-    {
-      q: 'Hva gir best separasjon i gasskromatografi?',
-      opts: ['Høy kolonne-temperatur','Lang kolonne og lav strømning','Kort kolonne og høy temperatur','Lav viskositet'],
-      ans: 'Lang kolonne og lav strømning',
-      exp: 'Lang kolonne og sakte bærerstrøm gir bedre separasjon.',
-    },
-    {
-      q: 'Hvilken detektor brukes ofte i HPLC for UV-absorberende stoffer?',
-      opts: ['Massespektrometer','NMR-detektor','UV-vis detektor','IR-detektor'],
-      ans: 'UV-vis detektor',
-      exp: 'UV-vis detektorer er vanlige i HPLC for stoffer som absorberer lys.',
-    },
-  ];
-  const item = qList[Math.floor(Math.random()*qList.length)];
-  return {
-    question: item.q,
-    type: 'mcq',
-    options: item.opts,
-    answer: item.ans,
-    hint: 'Husk definisjon av R_f og kromatografiske parametre.',
-    explanation: item.exp,
-  };
-}
-
-function t_catalysis_mcq() {
-  const qList = [
-    {
-      q: 'Hva gjør en katalysator med aktiveringsenergien i en reaksjon?',
-      opts: ['Øker den','Senker den','Endrer ΔH','Stopper reaksjonen'],
-      ans: 'Senker den',
-      exp: 'Katalysatoren senker Eₐ ved å tilby en alternativ reaksjonsvei.',
-    },
-    {
-      q: 'Hva skjer med likevekten når en katalysator tilsettes?',
-      opts: ['Skifter mot produkter','Skifter mot reaktanter','Ingen endring','Likevekten opphører'],
-      ans: 'Ingen endring',
-      exp: 'Katalysatoren påvirker reaksjonshastigheter men ikke likevektskonstanten.',
-    },
-    {
-      q: 'Hva gjør enzymene i kroppen?',
-      opts: ['Øker ΔG','Stabiliserer overgangstilstanden','Forbrukes i reaksjonen','Øker aktiveringsenergien'],
-      ans: 'Stabiliserer overgangstilstanden',
-      exp: 'Enzymer er biologiske katalysatorer som senker Eₐ ved å stabilisere overgangstilstanden.',
-    },
-  ];
-  const item = qList[Math.floor(Math.random()*qList.length)];
-  return {
-    question: item.q,
-    type: 'mcq',
-    options: item.opts,
-    answer: item.ans,
-    hint: 'Tenk på katalysatorens påvirkning av energiprofilen.',
-    explanation: item.exp,
-  };
-}
-
-// Build exam tasks
-function buildExamTasks(num = 120) {
-  const tasks = [];
-  const categories = [t_buffer_basic, t_titration_weak_strong, t_precipitation, t_cell_potential, t_arrhenius, t_calorimetry, t_equilibrium, t_electrolysis, t_organic_mcq, t_ir_mcq, t_naming_mcq, t_chromatography_mcq, t_catalysis_mcq];
-  let i = 0;
-  while (tasks.length < num) {
-    const task = categories[i % categories.length]();
-    tasks.push(task);
-    i++;
+  // Case 3: strong acid + weak base
+  if (acid.type === 'strong' && base.type === 'weak') {
+    const pKaBH = pKw - base.pKb; // pKa of the conjugate acid BH+
+    if (mBase === 0) {
+      // initial strong acid
+      const h = mAcid0 / Vtot;
+      return Math.max(0, Math.min(14, -log10(h)));
+    }
+    if (mBase < mAcid0) {
+      // strong acid still in excess; pH governed by excess H+
+      const h = (mAcid0 - mBase) / Vtot;
+      return Math.max(0, Math.min(14, -log10(h)));
+    } else if (mBase > mAcid0) {
+      // excess weak base; compute pOH from weak base approximation
+      const Cb_ex = (mBase - mAcid0) / Vtot;
+      const pOH = 0.5 * (base.pKb - log10(Cb_ex));
+      const ph = pKw - pOH;
+      return Math.max(0, Math.min(14, ph));
+    } else {
+      // at equivalence: weak acid BH+ present
+      const Csalt = mAcid0 / Vtot;
+      const ph = 0.5 * (pKaBH - log10(Csalt));
+      return Math.max(0, Math.min(14, ph));
+    }
   }
-  // Shuffle tasks
-  return tasks.sort(() => Math.random() - 0.5);
+
+  // Case 4: weak acid + weak base
+  if (acid.type === 'weak' && base.type === 'weak') {
+    // Use Henderson–Hasselbalch generalization: pH = 7 + 0.5*(pKa - pKb) + log10(n_base/n_acid)
+    const nAcid = mAcid0 - mBase;
+    const nBase = mBase;
+    // before equivalence: buffer of weak acid and weak base
+    if (nAcid > 0 && nBase >= 0) {
+      const ratio = nBase / nAcid;
+      const ph = 7 + 0.5 * (acid.pKa - base.pKb) + log10(ratio);
+      return Math.max(0, Math.min(14, ph));
+    }
+    if (mBase === mAcid0) {
+      // at equivalence
+      const ph = 7 + 0.5 * (acid.pKa - base.pKb);
+      return Math.max(0, Math.min(14, ph));
+    }
+    // after equivalence: base in excess (weak)
+    const Cb_ex = (mBase - mAcid0) / Vtot;
+    const pOH = 0.5 * (base.pKb - log10(Cb_ex));
+    const ph = pKw - pOH;
+    return Math.max(0, Math.min(14, ph));
+  }
+
+  // default fallback: neutral
+  return 7;
 }
 
+/**
+ * Main component implementing the interactive titration game.  Players can
+ * choose the analyte (acid), titrant (base), and indicator, adjust
+ * concentrations and volumes, and then add titrant in small increments
+ * while observing the pH change, colour shift, and titration curve.
+ * Difficulty modes hide certain information for advanced play.
+ */
 export default function TitrationGame() {
-  // State declarations
-  const [acidKey, setAcidKey] = useState('CH3COOH');
-  const [baseKey, setBaseKey] = useState('NaOH');
-  const acid = ACIDS[acidKey];
-  const base = BASES[baseKey];
-  const [Ca, setCa] = useState(0.10);
-  const [Cb, setCb] = useState(0.10);
+  // State variables controlling the choice of reagents and their
+  // concentrations/volumes.  Concentrations are in mol/L, volumes in
+  // litres.  Vb is the cumulative titrant volume added.  We store
+  // difficulty mode as a string ('Beginner', 'Intermediate', 'Advanced').
+  const [acid, setAcid] = useState(acids[0]);
+  const [base, setBase] = useState(bases[0]);
+  const [indicator, setIndicator] = useState(indicators[0]);
+  const [Ca, setCa] = useState(0.1);
   const [Va, setVa] = useState(0.025);
-  const [Vb, setVb] = useState(0.00);
-  const [indicatorKey, setIndicatorKey] = useState('Phenolphthalein');
-  const indicator = INDICATORS[indicatorKey];
-  const [difficulty, setDifficulty] = useState('Fri lek');
-  const [view, setView] = useState('home');
-  const [tasks, setTasks] = useState(() => buildExamTasks());
+  const [Cb, setCb] = useState(0.1);
+  const [Vb, setVb] = useState(0);
+  const [mode, setMode] = useState('Beginner');
+  const [message, setMessage] = useState('');
+
+  // -------------------------------------------------------------------------
+  // Exam state and navigation.  View can be 'titration', 'exam' or 'results'.
+  // Additional state variables track progress through the exam.
+  const [view, setView] = useState('titration');
   const [taskIndex, setTaskIndex] = useState(0);
   const [userAnswer, setUserAnswer] = useState('');
   const [examScore, setExamScore] = useState(0);
   const [examFinished, setExamFinished] = useState(false);
   const [showHint, setShowHint] = useState(false);
-  const [scoreHistory, setScoreHistory] = useState(() => {
-    try {
-      const raw = localStorage.getItem('scoreHistory');
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
-  useEffect(() => {
-    try { localStorage.setItem('scoreHistory', JSON.stringify(scoreHistory)); } catch {};
-  }, [scoreHistory]);
-  const [message, setMessage] = useState('Velkommen til det magiske laboratoriet!');
 
-  // Derived values
-  const pH = useMemo(() => computePH(acid, base, Ca, Cb, Va, Vb), [acid, base, Ca, Cb, Va, Vb]);
-  const equivalence = useMemo(() => {
-    const nA = Ca * Va;
-    if (Cb <= 0) return Infinity;
-    return nA / Cb;
-  }, [Ca, Va, Cb]);
-  useEffect(() => {
-    if (view !== 'titration') return;
-    if (equivalence === Infinity) return;
-    const diff = (Cb * Vb) - (Ca * Va);
-    if (diff < 0) setMessage('Før ekvivalens: løsningen er sur (bufferområde).');
-    else if (Math.abs(diff) < 1e-6) setMessage('Ekvivalenspunkt! Følg titreringskurven og indikatorvalget.');
-    else setMessage('Etter ekvivalens: overskudd base gir basisk løsning.');
-  }, [view, equivalence, Ca, Va, Cb, Vb]);
-
-  const graphData = useMemo(() => {
-    const pts = [];
-    const steps = difficulty === 'Avansert' ? 200 : (difficulty === 'Middels' ? 120 : 80);
-    const maxV = equivalence !== Infinity ? equivalence * 2 : (Vb > 0 ? Vb * 1.5 : 0.05);
-    for (let i = 0; i <= steps; i++) {
-      const v = (maxV * i) / steps;
-      const y = computePH(acid, base, Ca, Cb, Va, v);
-      pts.push({ x: v, y });
-    }
-    return pts;
-  }, [equivalence, difficulty, acid, base, Ca, Cb, Va, Vb]);
-
-  const indicatorColour = useMemo(() => {
-    const [start, end] = indicator.range;
-    if (pH <= start) return indicator.colours[0];
-    if (pH >= end) return indicator.colours[1];
-    const t = (pH - start) / (end - start);
-    return interpolateColour(indicator.colours[0], indicator.colours[1], t);
-  }, [indicator, pH]);
-
-  const buretteLevel = useMemo(() => {
-    const total = equivalence !== Infinity ? equivalence * 2 : (Cb > 0 ? (Ca * Va) / Cb * 2 : 0.05);
-    if (total <= 0) return 0;
-    return clamp((total - Vb) / total, 0, 1);
-  }, [equivalence, Ca, Va, Cb, Vb]);
-  const flaskLevel = useMemo(() => {
-    const max = equivalence !== Infinity ? Va + equivalence * 2 : Va + (Cb > 0 ? (Ca * Va) / Cb * 2 : 0.05);
-    return clamp((Va + Vb) / max, 0, 1);
-  }, [Va, Vb, equivalence, Ca, Cb]);
-
-  const difficulties = ['Fri lek','Middels','Avansert'];
-
-  function addVolume(delta) {
-    setVb(prev => {
-      let next = prev + delta;
-      if (equivalence !== Infinity) {
-        const maxV = equivalence * 2;
-        if (next > maxV) next = maxV;
-      }
-      return Math.max(0, next);
-    });
-  }
-  function reset() { setVb(0); setMessage('Titreringen tilbakestilt.'); }
-  function startExam() {
-    const newTasks = buildExamTasks();
-    setTasks(newTasks);
+  // Start a new exam: reset progress and scores.
+  const startExam = () => {
     setView('exam');
     setTaskIndex(0);
-    setUserAnswer('');
     setExamScore(0);
+    setUserAnswer('');
     setExamFinished(false);
     setShowHint(false);
-    setMessage('Eksamen startet!');
-  }
-  function submitAnswer() {
-    const task = tasks[taskIndex];
+  };
+
+  // Evaluate the current answer, update score and progress.
+  const submitAnswer = () => {
+    const task = examTasks[taskIndex];
     let correct = false;
     if (task.type === 'numeric') {
-      const val = parseFloat(userAnswer);
-      if (!isNaN(val)) correct = Math.abs(val - task.answer) <= task.tolerance;
-    } else {
-      correct = userAnswer === task.answer;
+      const val = parseFloat(userAnswer.replace(',', '.'));
+      if (!isNaN(val)) {
+        const tol = task.tolerance ?? 0;
+        if (Math.abs(val - task.answer) <= tol) {
+          correct = true;
+        }
+      }
+    } else if (task.type === 'mcq') {
+      if (parseInt(userAnswer, 10) === task.answer) {
+        correct = true;
+      }
     }
-    if (correct) setExamScore(prev => prev + 1);
-    if (taskIndex < tasks.length - 1) {
+    if (correct) {
+      setExamScore(prev => prev + 1);
+    }
+    if (taskIndex + 1 < examTasks.length) {
       setTaskIndex(prev => prev + 1);
       setUserAnswer('');
       setShowHint(false);
     } else {
       setExamFinished(true);
       setView('results');
-      const now = new Date().toLocaleString('nb-NO');
-      setScoreHistory(prev => [...prev, { date: now, score: examScore + (correct ? 1 : 0), total: tasks.length }]);
     }
-  }
-  function toggleHint() { setShowHint(prev => !prev); }
-  function goToSimulation() { setView('titration'); setShowHint(false); setUserAnswer(''); setMessage('Velkommen tilbake til titrering!'); }
-  function goToHome() { setView('home'); setMessage('Velkommen til det magiske laboratoriet!'); }
+  };
+
+  // Toggle hint visibility.
+  const toggleHint = () => {
+    setShowHint(prev => !prev);
+  };
+
+  // Navigate back to the titration simulator.
+  const goToSimulation = () => {
+    setView('titration');
+    setExamFinished(false);
+    setTaskIndex(0);
+    setUserAnswer('');
+    setShowHint(false);
+  };
+
+  // Compute equivalence volume in litres.  Guard division by zero.
+  const equivalence = useMemo(() => {
+    return Cb > 0 ? (Ca * Va) / Cb : Infinity;
+  }, [Ca, Va, Cb]);
+
+  // Current pH based on state.  We guard NaN by defaulting to 7.
+  const pH = useMemo(() => {
+    const phVal = computePH(acid, base, Ca, Va, Cb, Vb);
+    return isNaN(phVal) ? 7 : phVal;
+  }, [acid, base, Ca, Va, Cb, Vb]);
+
+  // -------------------------------------------------------------------------
+  // Fluid physics helpers
+  //
+  // We introduce a generic clamp function and two derived state values to
+  // represent how much liquid remains in the burette and how full the
+  // Erlenmeyer‑kolbe is.  These values are used to drive more realistic
+  // animations in the laboratory illustration.
+
+  // Clamp a number into a range [low, high].
+  const clamp = (value, low, high) => {
+    if (value < low) return low;
+    if (value > high) return high;
+    return value;
+  };
+
+  // Fraction of the total base volume still in the burette.  We assume the
+  // burette initially contains twice the equivalence volume of titrant, so
+  // that the animation continues smoothly past the equivalence point.
+  const buretteLevel = useMemo(() => {
+    const totalVol = equivalence !== Infinity ? equivalence * 2 : (Cb > 0 ? (Ca * Va) / Cb * 2 : 0.05);
+    if (!totalVol || totalVol <= 0) return 0;
+    return clamp((totalVol - Vb) / totalVol, 0, 1);
+  }, [equivalence, Ca, Va, Cb, Vb]);
+
+  // Fraction of the flask filled with solution (analyte + titrant).  When the
+  // titration passes twice the equivalence, we treat the flask as full.
+  const flaskLevel = useMemo(() => {
+    const maxVol = equivalence !== Infinity ? Va + equivalence * 2 : Va + (Cb > 0 ? (Ca * Va) / Cb * 2 : 0.05);
+    if (!maxVol || maxVol <= 0) return 0;
+    return clamp((Va + Vb) / maxVol, 0, 1);
+  }, [Va, Vb, equivalence, Ca, Cb]);
+
+  // Determine the current solution colour based on the indicator and pH.
+  const solutionColour = useMemo(() => {
+    const [start, end] = indicator.range;
+    const [c1, c2] = indicator.colours;
+    let t;
+    if (pH <= start) t = 0;
+    else if (pH >= end) t = 1;
+    else t = (pH - start) / (end - start);
+    return interpolateColour(c1, c2, t);
+  }, [indicator, pH]);
+
+  // Generate the titration curve path only when the reagents or
+  // concentrations change.  We sample 150 points between 0 and 1.5×V_eq.
+  const graphPath = useMemo(() => {
+    // avoid heavy computation if Cb is zero or V_eq is invalid
+    if (Cb <= 0) return '';
+    const Vmax = equivalence * 1.5 || 0.05;
+    const samples = 150;
+    const width = 300;
+    const height = 180;
+    let d = '';
+    for (let i = 0; i <= samples; i++) {
+      const V = (Vmax * i) / samples;
+      const ph = computePH(acid, base, Ca, Va, Cb, V);
+      const x = (width * i) / samples;
+      const y = height - (Math.max(0, Math.min(14, ph)) / 14) * height;
+      if (i === 0) d += `M ${x.toFixed(1)} ${y.toFixed(1)}`;
+      else d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }
+    return d;
+  }, [acid, base, Ca, Va, Cb, equivalence]);
+
+  // Update instructional message based on current progress.  For
+  // simplicity we distinguish three regions: before equivalence,
+  // near equivalence (within 0.3 mL), and after equivalence.
+  useEffect(() => {
+    if (equivalence === Infinity) {
+      setMessage('Skriv inn en gyldig konsentrasjon for base.');
+      return;
+    }
+    const diff = Vb - equivalence;
+    if (diff < -0.0003) {
+      setMessage('Før ekvivalens: løsningen er syrerik.');
+    } else if (Math.abs(diff) <= 0.0003) {
+      setMessage('Ekvivalenspunkt: nøytralisering er fullført.');
+    } else {
+      setMessage('Etter ekvivalens: løsningen er baserik.');
+    }
+  }, [Vb, equivalence]);
+
+  // Reset titration
+  const reset = () => {
+    setVb(0);
+  };
+
+  // Add a specified volume (in litres) of titrant.  We cap the volume at twice
+  // the equivalence point to keep the simulation bounded.
+  const addVolume = delta => {
+    setVb(prev => {
+      const maxV = equivalence * 2;
+      const next = prev + delta;
+      return next > maxV ? maxV : next;
+    });
+  };
+
+  // Determine whether the selected indicator is appropriate based on
+  // equivalence pH.  Provide a suggestion if not.
+  const indicatorHint = useMemo(() => {
+    // Compute pH at equivalence (approx) using computePH with Vb = V_eq
+    if (equivalence === Infinity) return '';
+    const phEq = computePH(acid, base, Ca, Va, Cb, equivalence);
+    const [start, end] = indicator.range;
+    if (phEq < start || phEq > end) {
+      return `Tips: Velg en indikator som skifter rundt pH ${phEq.toFixed(2)}.`;
+    }
+    return '';
+  }, [acid, base, Ca, Va, Cb, equivalence, indicator]);
 
   return (
-    <div className="siu-root">
-      <style>{`
-        :root { --primary:#1C2E8C; --secondary:#19B6D4; --accent:#F4C95D; --lilac:#A78BFA; --mint:#8DE3C3; }
-        .siu-root { min-height:100vh; display:flex; flex-direction:column; background: radial-gradient(circle at 30% 15%, #DFF7FF 0%, #EEF2FF 40%, #FFFFFF 75%), linear-gradient(135deg, rgba(25,182,212,0.12), rgba(244,201,93,0.12)); color:#0E153A; }
-        .header { position:sticky; top:0; z-index:10; background: linear-gradient(90deg, var(--primary), var(--secondary)); color:#fff; padding:14px 22px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 6px 16px rgba(0,0,0,0.1); }
-        .header .title { font-size:20px; font-weight:700; }
-        .nav-buttons button { margin-left:10px; padding:8px 14px; border:none; border-radius:16px; background: linear-gradient(120deg, var(--accent), var(--lilac)); color:#1C2E8C; font-weight:600; cursor:pointer; box-shadow:0 6px 12px rgba(0,0,0,0.15); transition:transform .2s, box-shadow .2s; }
-        .nav-buttons button:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 10px 20px rgba(0,0,0,0.2); }
-        .nav-buttons button:disabled { opacity:0.6; cursor:default; }
-        .main { flex:1; padding:18px 22px; display:grid; grid-gap:20px; }
-        .panel { background:rgba(255,255,255,0.8); backdrop-filter:blur(8px); border-radius:18px; padding:16px 20px; box-shadow:0 8px 20px rgba(0,0,0,0.1); border:1px solid rgba(0,0,0,0.05); }
-        .panel h2 { margin-top:0; margin-bottom:12px; font-size:18px; color:var(--primary); }
-        .controls-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-        label { display:flex; flex-direction:column; font-size:14px; color:var(--primary); }
-        select, input { padding:6px 9px; border:1px solid #CED7E8; border-radius:10px; background:#F8FBFF; font-size:14px; color:var(--primary); }
-        .primary { margin-top:8px; padding:8px 12px; border:none; border-radius:14px; background:linear-gradient(135deg, var(--secondary), var(--lilac)); color:#fff; font-weight:600; cursor:pointer; box-shadow:0 6px 16px rgba(0,0,0,0.15); transition:transform .2s; }
-        .primary:hover { transform:translateY(-2px); box-shadow:0 10px 20px rgba(0,0,0,0.2); }
-        .secondary { margin-top:8px; padding:8px 12px; border:none; border-radius:14px; background:linear-gradient(135deg, #FFFFFF, #F8FAFF); color:var(--primary); font-weight:600; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.1); transition:transform .2s; }
-        .secondary:hover { transform:translateY(-2px); box-shadow:0 8px 16px rgba(0,0,0,0.15); }
-        .graph { position:relative; height:260px; margin-top:8px; }
-        .graph svg { width:100%; height:100%; display:block; }
-        .progress-bar { height:8px; background:#E5EDFB; border-radius:4px; overflow:hidden; margin-bottom:8px; }
-        .progress-bar-inner { height:100%; background:linear-gradient(90deg, var(--secondary), var(--accent)); }
-        .scoreboard { max-height:200px; overflow-y:auto; font-size:13px; }
-        .scoreboard table { width:100%; border-collapse:collapse; }
-        .scoreboard th, .scoreboard td { padding:4px 6px; border-bottom:1px solid #E5EDFB; text-align:left; }
-        .scoreboard tr:nth-child(even) { background:rgba(229,237,251,0.5); }
-        .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; font-size:13px; }
-      `}</style>
-      {/* HEADER */}
-      <div className="header">
-        <div className="title">SiU KjemiLab</div>
-        <div className="nav-buttons">
-          <button onClick={goToHome} disabled={view === 'home'}>Hjem</button>
-          <button onClick={goToSimulation} disabled={view === 'titration'}>Titrering</button>
-          <button onClick={startExam} disabled={view === 'exam' || view === 'results'}>Eksamen</button>
+    <div className="titration-container">
+      {/* Dashboard header with navigation */}
+      <header className="dashboard-header">
+        <h1>SiU Lab – Kjemispill</h1>
+        <p>Utforsk syre–base titrering og test kjemikunnskapene dine</p>
+        <div style={{ marginTop: '0.8rem', display: 'flex', justifyContent: 'center', gap: '0.6rem' }}>
+          <button
+            className="button-primary"
+            onClick={goToSimulation}
+            disabled={view === 'titration'}
+          >
+            Titrering
+          </button>
+          <button
+            className="button-primary"
+            onClick={startExam}
+            disabled={view === 'exam' || view === 'results'}
+          >
+            Eksamen
+          </button>
         </div>
-      </div>
-      {/* HOME */}
-      {view === 'home' && (
-        <div className="main" style={{ gridTemplateColumns:'1fr' }}>
-          <div className="panel">
-            <h2>Velkommen!</h2>
-            <p>Utforsk titrering i et magisk laboratorium og forbered deg til Kjemi 2 med et omfattende utvalg av oppgaver. Designet er inspirert av eventyrlige farger og gir en hyggelig læringsopplevelse.</p>
-            <button className="primary" onClick={goToSimulation}>Start titrering</button>
-            <button className="secondary" onClick={startExam}>Ta eksamen</button>
+      </header>
+      <div className="game-dashboard" style={{ display: view === 'titration' ? 'block' : 'none' }}>
+        {/* Control panel */}
+        <section className="panel controls-panel">
+          <div className="control-group">
+            <label>Syre:</label>
+            <select value={acid.name} onChange={e => setAcid(acids.find(a => a.name === e.target.value))}>
+              {acids.map(a => (
+                <option key={a.name} value={a.name}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
-      )}
-      {/* TITRATION */}
-      {view === 'titration' && (
-        <div className="main" style={{ gridTemplateColumns:'1fr 1fr 1fr' }}>
-          <div className="panel">
-            <h2>Kontroller</h2>
-            <div className="controls-grid">
-              <label>Syre
-                <select value={acidKey} onChange={e => setAcidKey(e.target.value)}>{Object.keys(ACIDS).map(k => <option key={k} value={k}>{ACIDS[k].name}</option>)}</select>
-              </label>
-              <label>Base
-                <select value={baseKey} onChange={e => setBaseKey(e.target.value)}>{Object.keys(BASES).map(k => <option key={k} value={k}>{BASES[k].name}</option>)}</select>
-              </label>
-              <label>Ca (M)
-                <input type="number" step="0.01" value={Ca} onChange={e => setCa(parseFloat(e.target.value) || 0)} />
-              </label>
-              <label>Cb (M)
-                <input type="number" step="0.01" value={Cb} onChange={e => setCb(parseFloat(e.target.value) || 0)} />
-              </label>
-              <label>Va (L)
-                <input type="number" step="0.005" value={Va} onChange={e => setVa(parseFloat(e.target.value) || 0)} />
-              </label>
-              <label>Vb (L)
-                <input type="number" step="0.001" value={Vb} onChange={e => setVb(parseFloat(e.target.value) || 0)} />
-              </label>
-              <label>Indikator
-                <select value={indicatorKey} onChange={e => setIndicatorKey(e.target.value)}>{Object.keys(INDICATORS).map(k => <option key={k} value={k}>{INDICATORS[k].name}</option>)}</select>
-              </label>
-              <label>Vanskelighetsgrad
-                <select value={difficulty} onChange={e => setDifficulty(e.target.value)}>{difficulties.map(l => <option key={l} value={l}>{l}</option>)}</select>
-              </label>
-            </div>
-            <div style={{ marginTop:'8px', fontSize:'13px' }}>{message}</div>
-            <div style={{ marginTop:'4px' }}>pH: {difficulty === 'Avansert' ? 'Skjult' : pH.toFixed(2)}</div>
-            <div>V_eq: {equivalence === Infinity ? '-' : equivalence.toFixed(3)} L</div>
-            <div style={{ display:'flex', gap:'8px', marginTop:'8px' }}>
-              <button className="primary" onClick={() => addVolume(0.0005)}>+0,5 mL</button>
-              <button className="primary" onClick={() => addVolume(0.001)}>+1,0 mL</button>
-              <button className="secondary" onClick={reset}>Tilbakestill</button>
-            </div>
+          <div className="control-group">
+            <label>Base:</label>
+            <select value={base.name} onChange={e => setBase(bases.find(b => b.name === e.target.value))}>
+              {bases.map(b => (
+                <option key={b.name} value={b.name}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
           </div>
-          {/* Lab */}
-          <div className="panel">
-            <h2>Laboratorium</h2>
-            <svg width="100%" height="260" viewBox="0 0 700 260" preserveAspectRatio="xMidYMid meet">
+          <div className="control-group">
+            <label>Indikator:</label>
+            <select value={indicator.name} onChange={e => setIndicator(indicators.find(i => i.name === e.target.value))}>
+              {indicators.map(i => (
+                <option key={i.name} value={i.name}>
+                  {i.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="control-group">
+            <label>Konsentrasjon syre (mol/L):</label>
+            <input
+              type="number"
+              step="0.05"
+              min="0.01"
+              value={Ca}
+              onChange={e => setCa(Math.max(0.001, parseFloat(e.target.value) || 0))}
+            />
+          </div>
+          <div className="control-group">
+            <label>Volum syre (mL):</label>
+            <input
+              type="number"
+              step="0.5"
+              min="1"
+              value={Va * 1000}
+              onChange={e => setVa(Math.max(0.0001, parseFloat(e.target.value) / 1000 || 0))}
+            />
+          </div>
+          <div className="control-group">
+            <label>Konsentrasjon base (mol/L):</label>
+            <input
+              type="number"
+              step="0.05"
+              min="0.01"
+              value={Cb}
+              onChange={e => setCb(Math.max(0.001, parseFloat(e.target.value) || 0))}
+            />
+          </div>
+          <div className="control-group">
+            <label>Modus:</label>
+            <select value={mode} onChange={e => setMode(e.target.value)}>
+              <option value="Beginner">Lett</option>
+              <option value="Intermediate">Middels</option>
+              <option value="Advanced">Avansert</option>
+            </select>
+          </div>
+          <div className="control-group" style={{ marginTop: '0.5rem' }}>
+            <button className="button-primary" onClick={() => addVolume(0.0005)}>+0,5 mL</button>
+            <button className="button-primary" onClick={() => addVolume(0.001)} style={{ marginLeft: '0.5rem' }}>
+              +1,0 mL
+            </button>
+            <button className="button-secondary" onClick={reset} style={{ marginLeft: '0.5rem' }}>
+              Nullstill
+            </button>
+          </div>
+        </section>
+        {/* Laboratory view and graph */}
+        <section className="panel display-panel">
+          {/* Laboratory illustration */}
+          <div className="lab-view">
+            <svg width="200" height="260" viewBox="0 0 700 320">
               <defs>
+                {/* Gradient definitions for glass and meniscus */}
                 <linearGradient id="glassGrad" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.9" />
-                  <stop offset="50%" stopColor="#F1F5FF" stopOpacity="0.7" />
-                  <stop offset="100%" stopColor="#E2E8F0" stopOpacity="0.9" />
-                </linearGradient>
-                <linearGradient id="liquidGrad" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#19B6D4" />
-                  <stop offset="100%" stopColor="#A78BFA" />
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+                  <stop offset="60%" stopColor="#e5f0ff" stopOpacity="0.75" />
+                  <stop offset="100%" stopColor="#dbeafe" stopOpacity="0.95" />
                 </linearGradient>
                 <radialGradient id="meniscusGrad" cx="50%" cy="0%" r="50%">
-                  <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
-                  <stop offset="100%" stopColor="#94A3B8" stopOpacity="0.2" />
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
+                  <stop offset="100%" stopColor="#94a3b8" stopOpacity="0.15" />
                 </radialGradient>
               </defs>
-              {/* Stand and shelf */}
-              <rect x="20" y="10" width="12" height="220" fill="#475569" />
-              <rect x="20" y="230" width="140" height="8" fill="#334155" rx="3" />
-              {/* Burette */}
-              <g transform="translate(60,20)">
-                <rect x="0" y="0" width="24" height="200" fill="url(#glassGrad)" stroke="#94A3B8" strokeWidth="1" rx="7" />
+              {/* Bench */}
+              <rect x="0" y="300" width="700" height="20" fill="#cbd5e1" />
+              {/* Burette stand */}
+              <rect x="20" y="0" width="10" height="240" fill="#64748b" />
+              <rect x="20" y="240" width="120" height="8" fill="#475569" rx="3" />
+              {/* Burette tube and contents */}
+              <g transform="translate(50,10)">
+                {/* Tube */}
+                <rect x="0" y="0" width="20" height="200" fill="url(#glassGrad)" stroke="#94a3b8" strokeWidth="1" rx="6" />
+                {/* Tick marks */}
                 {Array.from({ length: 21 }).map((_, i) => {
                   const y = i * 10;
                   return (
-                    <line key={i} x1="0" x2={i % 5 === 0 ? -10 : -6} y1={y} y2={y} stroke="#475569" strokeWidth={i % 5 === 0 ? 2 : 1} />
+                    <line
+                      key={i}
+                      x1="0"
+                      x2={i % 5 === 0 ? -8 : -5}
+                      y1={y}
+                      y2={y}
+                      stroke="#64748b"
+                      strokeWidth={i % 5 === 0 ? 2 : 1}
+                    />
                   );
                 })}
-                <rect x="2" y={200 * (1 - buretteLevel)} width="20" height={200 * buretteLevel} fill={pHColour(pH)} opacity="0.6" />
-                <ellipse cx="12" cy={200 * (1 - buretteLevel)} rx="11" ry="4" fill="url(#meniscusGrad)" opacity="0.9" />
-                <rect x="22" y="200" width="12" height="14" fill="#94A3B8" rx="3" />
-                <rect x="34" y="212" width="40" height="8" fill="#94A3B8" rx="4" />
+                {/* Liquid level */}
+                <rect x="1" y="0" width="18" height={200 * buretteLevel} fill={solutionColour} opacity="0.65" />
+                {/* Meniscus */}
+                <ellipse
+                  cx="10"
+                  cy={200 * buretteLevel}
+                  rx="9"
+                  ry="3"
+                  fill="url(#meniscusGrad)"
+                  opacity="0.8"
+                />
+                {/* Stopcock and nozzle */}
+                <rect x="17" y="200" width="10" height="12" fill="#94a3b8" rx="2" />
+                <rect x="25" y="210" width="35" height="6" fill="#94a3b8" rx="3" />
               </g>
+              {/* Droplet falling when titrant is added */}
               {Vb > 0 && (
-                <circle cx="120" cy="230" r="5" fill={pHColour(pH)}>
-                  <animate attributeName="cy" values="220; 230; 220" dur="1.6s" repeatCount="indefinite" />
-                </circle>
+                <g>
+                  <circle cx="120" cy="225" r="4" fill={solutionColour}>
+                    <animate attributeName="cy" values="210; 225; 210" dur="1.8s" repeatCount="indefinite" />
+                  </circle>
+                </g>
               )}
-              <g transform="translate(300,100)">
-                <path d="M60,0 L100,0 L112,90 C116,120 -4,120 0,90 Z" fill="url(#glassGrad)" stroke="#94A3B8" strokeWidth="1" />
-                <rect x="70" y="-38" width="20" height="40" fill="url(#glassGrad)" stroke="#94A3B8" strokeWidth="1" rx="5" />
+              {/* Erlenmeyer flask */}
+              <g transform="translate(200,110)">
+                {/* Flask body */}
+                <path
+                  d="M60,0 L100,0 L112,90 C116,120 -4,120 0,90 Z"
+                  fill="url(#glassGrad)"
+                  stroke="#94a3b8"
+                  strokeWidth="1"
+                />
+                {/* Neck */}
+                <rect x="70" y="-38" width="20" height="40" fill="url(#glassGrad)" stroke="#94a3b8" strokeWidth="1" rx="5" />
+                {/* Liquid with curved meniscus */}
                 {(() => {
                   const h = Math.max(1, 70 * flaskLevel);
                   return (
                     <g>
-                      <path d={`M12,90 C14,${90 - h} 98,${90 - h} 100,90 Z`} fill="url(#liquidGrad)" opacity="0.5" />
-                      <path d={`M14,${90 - h} Q56,${90 - h - 5} 96,${90 - h}`} stroke="#19B6D4" strokeWidth="2" fill="none" />
+                      <path
+                        d={'M10,90 C12,' + (90 - h) + ' 100,' + (90 - h) + ' 102,90 Z'}
+                        fill={solutionColour}
+                        opacity="0.45"
+                      />
+                      <path
+                        d={'M12,' + (90 - h) + ' Q56,' + (90 - h - 6) + ' 98,' + (90 - h)}
+                        stroke={solutionColour}
+                        strokeOpacity="0.6"
+                        strokeWidth="2"
+                        fill="none"
+                      />
                     </g>
                   );
                 })()}
-                <path d="M12,90 C14,50 98,50 100,90 Z" fill={indicatorColour} opacity="0.25" />
-                {Array.from({ length: 14 }).map((_, i) => {
+                {/* Indicator tint overlay */}
+                <path
+                  d="M10,90 C12,50 100,50 102,90 Z"
+                  fill={solutionColour}
+                  opacity="0.25"
+                />
+                {/* Bubble animations */}
+                {Array.from({ length: 12 }).map((_, i) => {
                   const cx = 20 + Math.random() * 80;
                   const cy = 70 + Math.random() * 20;
                   const r = 2 + Math.random() * 3;
@@ -747,157 +670,132 @@ export default function TitrationGame() {
                   const delay = (Math.random() * 2).toFixed(2) + 's';
                   return (
                     <circle key={i} cx={cx} cy={cy} r={r} fill="rgba(255,255,255,0.85)">
-                      <animate attributeName="cy" values={`${cy}; ${cy - 30}; ${cy}`} dur={dur} repeatCount="indefinite" begin={delay} />
+                      <animate attributeName="cy" values={cy + '; ' + (cy - 30) + '; ' + cy} dur={dur} repeatCount="indefinite" begin={delay} />
                     </circle>
                   );
                 })}
               </g>
-              <rect x="0" y="248" width="700" height="12" fill="#C3D5E4" />
             </svg>
-            <div className="graph">
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-                <line x1="10" y1="5" x2="10" y2="90" stroke="#334155" strokeWidth="0.6" />
-                <line x1="10" y1="90" x2="95" y2="90" stroke="#334155" strokeWidth="0.6" />
-                {Array.from({ length: 8 }).map((_, i) => {
-                  const p = i * 2;
-                  const y = 90 - (p / 14) * 85;
-                  return (
-                    <g key={i}>
-                      <line x1="9" x2="10" y1={y} y2={y} stroke="#334155" strokeWidth="0.6" />
-                      <text x="6" y={y + 2.2} fontSize="3" textAnchor="end" fill="#475569">{p}</text>
-                      <line x1="10" x2="95" y1={y} y2={y} stroke="#E5EDFB" strokeWidth="0.3" />
-                    </g>
-                  );
-                })}
-                {(() => {
-                  const maxX = graphData[graphData.length - 1]?.x || 1;
-                  const eq = equivalence === Infinity ? 0 : equivalence;
-                  const xs = [0, maxX * 0.25, eq, maxX * 0.75, maxX];
-                  return xs.map((vx, i) => {
-                    const x = 10 + (vx / maxX) * 85;
-                    const label = i === 2 ? 'V_eq' : vx.toFixed(3);
-                    return (
-                      <g key={i}>
-                        <line x1={x} x2={x} y1="90" y2="91" stroke="#334155" strokeWidth="0.6" />
-                        <text x={x} y="96" fontSize="3" textAnchor="middle" fill="#475569">{label}</text>
-                        <line x1={x} x2={x} y1="10" y2="90" stroke="#E5EDFB" strokeWidth="0.3" />
-                      </g>
-                    );
-                  });
-                })()}
-                {graphData.map((pt, idx) => {
-                  if (idx === 0) return null;
-                  const prev = graphData[idx - 1];
-                  const maxX = graphData[graphData.length - 1]?.x || 1;
-                  const x1 = 10 + (prev.x / maxX) * 85;
-                  const y1 = 90 - (prev.y / 14) * 85;
-                  const x2 = 10 + (pt.x / maxX) * 85;
-                  const y2 = 90 - (pt.y / 14) * 85;
-                  return <line key={idx} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#1C2E8C" strokeWidth="0.8" />;
-                })}
-                {(() => {
-                  const maxX = graphData[graphData.length - 1]?.x || 1;
-                  const x = 10 + (Vb / maxX) * 85;
-                  const y = 90 - (pH / 14) * 85;
-                  return <circle cx={x} cy={y} r="1.5" fill="#E83E8C" />;
-                })()}
-                <text x="4" y="4" fontSize="3" fill="#475569" transform="rotate(-90,4,4)">pH</text>
-                <text x="52" y="99" fontSize="3" fill="#475569">V_base (L)</text>
-              </svg>
+          </div>
+          {/* Graph */}
+          <div className="graph-view">
+            <svg width="300" height="200" viewBox="0 0 300 180">
+              <rect x="0" y="0" width="300" height="180" fill="#f0f4f8" stroke="#ddd" />
+              {/* pH curve */}
+              {graphPath && <path d={graphPath} stroke="#2c7bb6" strokeWidth="2" fill="none" />}
+              {/* Marker for current point */}
+              {(() => {
+                if (!Cb || equivalence === Infinity) return null;
+                const Vmax = equivalence * 1.5 || 0.05;
+                const x = Math.min(1, Vb / Vmax) * 300;
+                const y = 180 - (Math.max(0, Math.min(14, pH)) / 14) * 180;
+                return <circle cx={x} cy={y} r="4" fill="#d73027" />;
+              })()}
+              {/* Equivalence line */}
+              {(() => {
+                if (!Cb || equivalence === Infinity) return null;
+                const Vmax = equivalence * 1.5 || 0.05;
+                const xEq = Math.min(1, equivalence / Vmax) * 300;
+                return <line x1={xEq} y1="0" x2={xEq} y2="180" stroke="#999" strokeDasharray="4,4" />;
+              })()}
+            </svg>
+            <div className="graph-labels">
+              <span>0 mL</span>
+              <span style={{ marginLeft: 'auto' }}>{(equivalence * 1000 * 1.5).toFixed(1)} mL</span>
             </div>
           </div>
-          <div className="panel">
-            <h2>Informasjon</h2>
-            <div className="info-grid">
-              <div>
-                <strong>Indikator</strong>
-                <div style={{ display:'flex', alignItems:'center', gap:'8px', marginTop:'6px' }}>
-                  <svg width="120" height="20">
-                    <defs>
-                      <linearGradient id="indiGrad" x1="0" x2="1">
-                        <stop offset="0%" stopColor={INDICATORS[indicatorKey].colours[0]} />
-                        <stop offset="100%" stopColor={INDICATORS[indicatorKey].colours[1]} />
-                      </linearGradient>
-                    </defs>
-                    <rect x="0" y="0" width="120" height="20" rx="6" fill="url(#indiGrad)" stroke="#E5EDFB" />
-                  </svg>
-                  <div style={{ width:'20px', height:'20px', borderRadius:'6px', background: indicatorColour, border:'1px solid #E5EDFB' }}></div>
-                </div>
-                <div style={{ marginTop:'4px' }}>
-                  <div><b>{INDICATORS[indicatorKey].name}</b></div>
-                  <div>pH-område: {INDICATORS[indicatorKey].range[0]}–{INDICATORS[indicatorKey].range[1]}</div>
-                  <div>Bruk: {INDICATORS[indicatorKey].use}</div>
-                </div>
-              </div>
-              <div>
-                <strong>Kjemi</strong>
-                <div style={{ marginTop:'4px' }}>
-                  <div><b>Syre:</b> {acid.name}</div>
-                  <div>Type: {acid.strong ? 'Sterk' : 'Svak'} {acid.Ka !== Infinity ? `(Kₐ=${acid.Ka})` : ''}</div>
-                  <div>Info: {acid.info}</div>
-                  <div style={{ marginTop:'8px' }}><b>Base:</b> {base.name}</div>
-                  <div>Type: {base.strong ? 'Sterk' : 'Svak'} {base.Kb !== Infinity ? `(K_b=${base.Kb})` : ''}</div>
-                  <div>Info: {base.info}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* EXAM */}
+        </section>
+        {/* Information panel */}
+        <section className="panel info-panel">
+          <p>
+            Volum tilsatt: {(Vb * 1000).toFixed(2)} mL{' '}
+            {equivalence !== Infinity && ` (ekvivalens ved ${(equivalence * 1000).toFixed(2)} mL)`}
+          </p>
+          {mode !== 'Advanced' && <p>pH = {pH.toFixed(2)}</p>}
+          {mode === 'Advanced' && <p>pH = ??? (skjult)</p>}
+          <p>{message}</p>
+        {indicatorHint && <p style={{ color: '#d73027' }}>{indicatorHint}</p>}
+        </section>
+      </div>
+
       {view === 'exam' && (
-        <div className="main" style={{ gridTemplateColumns:'1fr' }}>
-          <div className="panel">
+        <div className="game-dashboard">
+          <section className="panel display-panel">
             <h2>Eksamen</h2>
-            <div className="progress-bar"><div className="progress-bar-inner" style={{ width: ((taskIndex) / tasks.length) * 100 + '%' }}></div></div>
-            <p>Oppgave {taskIndex + 1} av {tasks.length}</p>
-            <p style={{ whiteSpace:'pre-wrap' }}>{tasks[taskIndex].question}</p>
-            {tasks[taskIndex].type === 'numeric' ? (
-              <input type="number" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} />
+            <p>Oppgave {taskIndex + 1} av {examTasks.length}</p>
+            <p>{examTasks[taskIndex].question}</p>
+            {examTasks[taskIndex].type === 'numeric' ? (
+              <input
+                type="number"
+                step="0.01"
+                value={userAnswer}
+                onChange={e => setUserAnswer(e.target.value)}
+                style={{ width: '100%', padding: '0.5rem', margin: '0.5rem 0' }}
+              />
             ) : (
-              <div>{tasks[taskIndex].options.map(opt => (
-                <label key={opt} style={{ display:'block', marginTop:'4px' }}>
-                  <input type="radio" name="option" value={opt} checked={userAnswer === opt} onChange={e => setUserAnswer(e.target.value)} /> {opt}
-                </label>
-              ))}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0.5rem 0' }}>
+                {examTasks[taskIndex].options.map((opt, idx) => (
+                  <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <input
+                      type="radio"
+                      name="mcq"
+                      value={idx}
+                      checked={userAnswer === String(idx)}
+                      onChange={e => setUserAnswer(e.target.value)}
+                    />
+                    {opt}
+                  </label>
+                ))}
+              </div>
             )}
-            {showHint && <p style={{ fontStyle:'italic', background:'#F8FBFF', padding:'6px', borderRadius:'8px', border:'1px dashed #D3DFF5' }}><strong>Hint:</strong> {tasks[taskIndex].hint}</p>}
-            <div style={{ display:'flex', gap:'8px', marginTop:'8px' }}>
-              <button className="secondary" onClick={toggleHint}>{showHint ? 'Skjul hint' : 'Vis hint'}</button>
-              <button className="primary" onClick={submitAnswer}>{taskIndex === tasks.length - 1 ? 'Fullfør' : 'Neste'}</button>
-              <button className="secondary" onClick={goToSimulation}>Avbryt</button>
+            {showHint && (
+              <p style={{ fontStyle: 'italic', color: '#7058a5', marginTop: '0.5rem' }}>
+                {examTasks[taskIndex].hint}
+              </p>
+            )}
+            <div style={{ marginTop: '0.8rem', display: 'flex', gap: '0.6rem' }}>
+              <button className="button-secondary" onClick={toggleHint}>Vis hint</button>
+              <button
+                className="button-primary"
+                onClick={submitAnswer}
+                disabled={userAnswer === ''}
+              >
+                {taskIndex + 1 === examTasks.length ? 'Fullfør' : 'Neste'}
+              </button>
+              <button className="button-secondary" onClick={goToSimulation}>Avbryt</button>
             </div>
-          </div>
+            <p style={{ marginTop: '0.6rem' }}>Poeng: {examScore}</p>
+          </section>
         </div>
       )}
-      {/* RESULTS */}
+
       {view === 'results' && (
-        <div className="main" style={{ gridTemplateColumns:'1fr' }}>
-          <div className="panel">
-            <h2>Resultater</h2>
-            <p>Du fikk <b>{examScore}</b> av <b>{tasks.length}</b> riktige!</p>
-            <div className="scoreboard">
-              <table><thead><tr><th>Dato</th><th>Riktige</th><th>Totalt</th></tr></thead><tbody>{scoreHistory.map((row, idx) => (<tr key={idx}><td>{row.date}</td><td>{row.score}</td><td>{row.total}</td></tr>))}</tbody></table>
+        <div className="game-dashboard">
+          <section className="panel display-panel">
+            <h2>Resultat</h2>
+            <p>Du fikk {examScore} av {examTasks.length} riktige svar.</p>
+            <div style={{ marginTop: '1rem', maxHeight: '200px', overflowY: 'auto' }}>
+              {examTasks.map((task, idx) => (
+                <div key={idx} style={{ marginBottom: '0.8rem' }}>
+                  <strong>Oppgave {idx + 1}:</strong> {task.question}
+                  <br />
+                  <strong>Riktig svar:</strong>{' '}
+                  {task.type === 'numeric'
+                    ? `${task.answer.toFixed(2)}`
+                    : task.options[task.answer]}
+                  <br />
+                  <em>{task.explanation}</em>
+                </div>
+              ))}
             </div>
-            <h3>Forklaringer</h3>
-            <ol style={{ paddingLeft:'16px' }}>{tasks.map((task,i) => {
-              const firstLine = task.question.split('\n')[0];
-              return (
-                <li key={i} style={{ marginBottom:'8px' }}>
-                  <strong>{firstLine}</strong><br />
-                  <em>Riktig svar:</em> {typeof task.answer === 'number' ? task.answer : task.answer.toString()}<br />
-                  <em>Forklaring:</em> {task.explanation}
-                </li>
-              );
-            })}</ol>
-            <div style={{ display:'flex', gap:'8px', marginTop:'8px' }}>
-              <button className="primary" onClick={startExam}>Prøv igjen</button>
-              <button className="secondary" onClick={goToSimulation}>Tilbake til titrering</button>
-              <button className="secondary" onClick={goToHome}>Hjem</button>
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.6rem' }}>
+              <button className="button-primary" onClick={startExam}>Prøv igjen</button>
+              <button className="button-secondary" onClick={goToSimulation}>Tilbake til titrering</button>
             </div>
-          </div>
+          </section>
         </div>
       )}
+
     </div>
   );
 }
