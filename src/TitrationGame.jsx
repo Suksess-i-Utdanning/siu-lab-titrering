@@ -229,11 +229,259 @@ const GENERAL_TASKS = [
   },
 ];
 
+// Step 3: Additional titration tasks to expand the exam bank.  Each task requires
+// the student to perform a complete titration with correct reagents, volumes and indicator.
+const ADDITIONAL_TITRATION_TASKS = [
+  {
+    type: 'titration',
+    question: 'Titrer 25,0 mL av en 0,10 M HNO₃‑løsning med 0,10 M KOH til ekvivalens. Velg riktig indikator.',
+    acid: 'HNO3',
+    base: 'KOH',
+    Ca: 0.10,
+    Cb: 0.10,
+    Va: 0.025,
+    expectedVolume: 0.025,
+    indicator: 'BromothymolBlue',
+    hint: 'Sterk syre mot sterk base gir pH cirka 7 ved ekvivalens. Bromtymolblått skifter rundt pH 7.',
+    solution:
+      'HNO₃ er en sterk syre og KOH en sterk base. Ekvivalenspunktet nås når n(H⁺) = n(OH⁻): V_b = (C_a·V_a)/C_b = (0,10·0,025)/0,10 = 0,025 L. Ekvivalens pH ≈ 7, så Bromtymolblått (pH 6,0–7,6) er passende.',
+  },
+  {
+    type: 'titration',
+    question: 'Titrer 15,0 mL av en 0,05 M CH₃COOH‑løsning med 0,10 M NaOH til ekvivalens. Velg riktig indikator.',
+    acid: 'CH3COOH',
+    base: 'NaOH',
+    Ca: 0.05,
+    Cb: 0.10,
+    Va: 0.015,
+    expectedVolume: 0.0075,
+    indicator: 'Phenolphthalein',
+    hint: 'Svak syre titrert med sterk base gir pH over 7 ved ekvivalens. Fenolftalein skifter i basisk område.',
+    solution:
+      'Antall mol syre: 0,05·0,015 = 7,5·10⁻⁴ mol. Med 0,10 M NaOH kreves V_b = n/C_b = 7,5·10⁻⁴/0,10 = 7,5·10⁻³ L = 0,0075 L. Ved ekvivalens er pH > 7, så fenolftalein (pH 8,2–10) er riktig.',
+  },
+  {
+    type: 'titration',
+    question: 'Titrer 50,0 mL av en 0,08 M maursyre (HCOOH) med 0,12 M NaOH til ekvivalens. Velg riktig indikator.',
+    acid: 'HCOOH',
+    base: 'NaOH',
+    Ca: 0.08,
+    Cb: 0.12,
+    Va: 0.050,
+    expectedVolume: 0.0333,
+    indicator: 'Phenolphthalein',
+    hint: 'Svak syre titrert med sterk base gir basisk løsning ved ekvivalens. Indikator bør skifte over 8.',
+    solution:
+      'Mol syre = 0,08·0,050 = 4,0·10⁻³ mol. Med 0,12 M base: V_b = n/C_b = 4,0·10⁻³/0,12 = 0,0333 L. Ekvivalens pH > 7 fordi HCOOH er svak syre. Fenolftalein (pH 8,2–10) er egnet.',
+  },
+  {
+    type: 'titration',
+    question: 'Titrer 30,0 mL av en 0,10 M HCl‑løsning med 0,05 M NH₃ til ekvivalens. Velg riktig indikator.',
+    acid: 'HCl',
+    base: 'NH3',
+    Ca: 0.10,
+    Cb: 0.05,
+    Va: 0.030,
+    expectedVolume: 0.060,
+    indicator: 'MethylOrange',
+    hint: 'Sterk syre mot svak base gir surt ekvivalenspunkt (pH < 7). Velg en indikator som skifter i surt område.',
+    solution:
+      'Mol HCl = 0,10·0,030 = 3,0·10⁻³ mol. Med 0,05 M NH₃ kreves V_b = n/C_b = 3,0·10⁻³/0,05 = 0,060 L. EkvivalenspH < 7 (sterk syre + svak base), så metyloransje (pH 3,1–4,4) er best.',
+  },
+  {
+    type: 'titration',
+    question: 'Titrer 20,0 mL av en 0,12 M HCN‑løsning med 0,10 M NaOH til ekvivalens. Velg riktig indikator.',
+    acid: 'HCN',
+    base: 'NaOH',
+    Ca: 0.12,
+    Cb: 0.10,
+    Va: 0.020,
+    expectedVolume: 0.024,
+    indicator: 'Phenolphthalein',
+    hint: 'HCN er svært svak syre; ekvivalenspunktet vil være sterkt basisk (pH høyt). Trenger indikator som skifter ved høy pH.',
+    solution:
+      'Mol HCN = 0,12·0,020 = 2,4·10⁻³ mol. Med 0,10 M NaOH kreves V_b = n/C_b = 2,4·10⁻³/0,10 = 0,024 L. Ettersom HCN er en ekstremt svak syre, blir pH ved ekvivalens høyt (≈ 11), så fenolftalein er egnet.',
+  },
+  {
+    type: 'titration',
+    question: 'Titrer 10,0 mL av en 0,10 M CH₃COOH med 0,05 M KOH til ekvivalens. Velg riktig indikator.',
+    acid: 'CH3COOH',
+    base: 'KOH',
+    Ca: 0.10,
+    Cb: 0.05,
+    Va: 0.010,
+    expectedVolume: 0.020,
+    indicator: 'Phenolphthalein',
+    hint: 'Svak syre mot sterk base gir pH > 7 ved ekvivalens.',
+    solution:
+      'Mol CH₃COOH = 0,10·0,010 = 1,0·10⁻³ mol. Med 0,05 M KOH: V_b = n/C_b = 1,0·10⁻³/0,05 = 0,020 L. Ved ekvivalens er løsningen basisk; fenolftalein passer best.',
+  },
+];
+
+// Step 3: Additional general Kjemi 2 tasks.  These cover a broad range of topics:
+// acid–base, equilibrium, solubility, kinetics, thermodynamics and organic chemistry.
+const ADDITIONAL_GENERAL_TASKS = [
+  {
+    type: 'numeric',
+    question: 'Beregn pH for en 0,010 M HCl‑løsning.',
+    answer: 2.00,
+    tolerance: 0.05,
+    hint: 'For sterk syre: [H⁺] = C. pH = −log([H⁺]).',
+    solution: '0,010 M HCl gir [H⁺] = 0,010 M. pH = −log(0,010) = 2,00.',
+  },
+  {
+    type: 'numeric',
+    question: 'Beregn pH for 0,20 M NH₃ (Kb = 1,8×10⁻⁵).',
+    answer: 11.28,
+    tolerance: 0.05,
+    hint: 'Svak base: bruk K_b = x²/(C − x); antatt x ≪ C.',
+    solution: 'x = √(K_b·C) = √(1,8·10⁻⁵·0,20) = 0,00166 M. pOH = −log(0,00166) = 2,78 → pH = 14 − 2,78 = 11,22 (≈ 11,28).',
+  },
+  {
+    type: 'numeric',
+    question: 'Hvilket forhold [A⁻]/[HA] trengs for at en CH₃COOH/CH₃COONa‑buffer skal ha pH = 5,00? pKₐ(CH₃COOH) = 4,76.',
+    answer: 1.74,
+    tolerance: 0.10,
+    hint: 'Henderson–Hasselbalch: pH = pKₐ + log([base]/[syre]).',
+    solution: 'pH − pKₐ = log([base]/[syre]) → 5,00 − 4,76 = log(R). R = 10^(0,24) ≈ 1,74.',
+  },
+  {
+    type: 'numeric',
+    question: 'Løselighetsproduktet for CaF₂ er K_sp = 3,9×10⁻¹¹. Beregn løseligheten (s) av Ca²⁺ i ren løsning (M).',
+    answer: 0.00021,
+    tolerance: 0.00005,
+    hint: 'K_sp = 4·s³ for CaF₂: CaF₂(s) ⇌ Ca²⁺ + 2 F⁻.',
+    solution: 'K_sp = 4s³ → s = (K_sp/4)^(1/3) = (3,9×10⁻¹¹/4)^(1/3) ≈ 2,14×10⁻⁴ M.',
+  },
+  {
+    type: 'numeric',
+    question: 'Beregn standard cellepotensial for galvanisk celle Fe³⁺/Fe²⁺ (E° = +0,77 V) og Zn²⁺/Zn (E° = –0,76 V).',
+    answer: 1.53,
+    tolerance: 0.05,
+    hint: 'E°_celle = E°_katode – E°_anode. Velg mer positiv som katode.',
+    solution: 'E° = 0,77 – (–0,76) = 1,53 V.',
+  },
+  {
+    type: 'numeric',
+    question: 'For en reaksjon er k₁ = 0,015 s⁻¹ ved 298 K og k₂ = 0,045 s⁻¹ ved 308 K. Beregn aktiveringsenergien Eₐ (kJ/mol).',
+    answer: 83.8,
+    tolerance: 1.0,
+    hint: 'Arrhenius: ln(k₂/k₁) = Eₐ/R·(1/T₁ − 1/T₂).',
+    solution: 'ln(0,045/0,015) = Eₐ/8,314·(1/298 − 1/308). Løs for Eₐ: ≈ 83,8 kJ/mol.',
+  },
+  {
+    type: 'numeric',
+    question: 'En førsteordensreaksjon har ratekonstant k = 0,050 s⁻¹. Beregn halveringstiden t½ (s).',
+    answer: 13.86,
+    tolerance: 0.5,
+    hint: 'For førsteorden: t½ = ln 2 / k.',
+    solution: 't½ = ln(2)/0,050 ≈ 13,86 s.',
+  },
+  {
+    type: 'mcq',
+    question: 'Hva er pKₐ for en syre med Kₐ = 1,0×10⁻³?',
+    options: ['1', '2', '3', '4'],
+    answer: 3,
+    hint: 'pKₐ = −log₁₀(Kₐ).',
+    solution: 'pKₐ = −log₁₀(1,0×10⁻³) = 3.',
+  },
+  {
+    type: 'mcq',
+    question: 'Blandes 0,050 L av 0,10 M AgNO₃ med 0,050 L av 0,10 M NaCl. Vil det danne bunnfall? (K_sp(AgCl) = 1,8×10⁻¹⁰).',
+    options: ['Ja', 'Nei'],
+    answer: 0,
+    hint: 'Beregn Q = [Ag⁺][Cl⁻] etter fortynning og sammenlign med K_sp.',
+    solution: '[Ag⁺] = [Cl⁻] = (0,10·0,050)/(0,100) = 0,05 M. Q = 0,05² = 2,5×10⁻³ ≫ 1,8×10⁻¹⁰ ⇒ bunnfall dannes.',
+  },
+  {
+    type: 'mcq',
+    question: 'Hva beskriver best reaksjonsmekanismen for SN2?',
+    options: [
+      'Molekylær eliminasjon med to steg',
+      'En‑trinns nukleofilt angrep fra motsatt side',
+      'Radikal substitusjon',
+      'Dannelse av karbokation mellomprodukt',
+    ],
+    answer: 1,
+    hint: 'SN2 skjer i ett steg og gir inversjon av konfigurasjon.',
+    solution: 'SN2 : en trinn, baksiden angrep, overgangstilstand, gir ofte inversjon av kiralt senter.',
+  },
+  {
+    type: 'numeric',
+    question: 'Beregn ΔG° (kJ) for en reaksjon med ΔH° = −125 kJ/mol og ΔS° = −150 J/(mol·K) ved 298 K.',
+    answer: -80.3,
+    tolerance: 2.0,
+    hint: 'ΔG° = ΔH° − T·ΔS°. Husk å konvertere J til kJ.',
+    solution: 'ΔG° = −125 kJ − 298·(−0,150 kJ/K) = −125 kJ + 44,7 kJ = −80,3 kJ.',
+  },
+  {
+    type: 'numeric',
+    question: 'Hvilket volum 0,10 M NaOH trengs for å titrere 0,025 L av en 0,12 M HCl fullstendig?',
+    answer: 0.03,
+    tolerance: 0.001,
+    hint: 'n(HCl) = C·V. V_b = n/C_b.',
+    solution: 'n(HCl) = 0,12·0,025 = 0,0030 mol. Med 0,10 M NaOH: V_b = 0,0030/0,10 = 0,030 L.',
+  },
+  {
+    type: 'numeric',
+    question: 'Beregn pH i ekvivalenspunket når 0,050 M CH₃COOH titreres med 0,050 M NaOH (pKₐ = 4,76).',
+    answer: 8.90,
+    tolerance: 0.10,
+    hint: 'Ved ekvivalens: løsningen består av CH₃COO⁻. Bruk K_b = K_w/Kₐ.',
+    solution: 'K_b = 10⁻¹⁴/10⁻⁴,⁷⁶ ≈ 5,75×10⁻¹⁰. [A⁻] = C = 0,050 M. [OH⁻] = √(K_b·C) ≈ √(5,75×10⁻¹⁰·0,050) = 5,36×10⁻⁶ M. pOH = 5,27 → pH = 8,90.',
+  },
+  {
+    type: 'numeric',
+    question: 'En løsning av Fe³⁺ har initialt [Fe³⁺]₀ = 0,20 M. Ved likevekt for Fe³⁺ + SCN⁻ ⇌ FeSCN²⁺ er [SCN⁻] = 0,15 M og [FeSCN²⁺] = 0,05 M. Beregn K_c.',
+    answer: 1.67,
+    tolerance: 0.05,
+    hint: 'K_c = [FeSCN²⁺]/([Fe³⁺][SCN⁻]).',
+    solution: '[Fe³⁺]_eq = 0,20 − 0,05 = 0,15 M. K_c = 0,05/(0,15·0,15) = 1,67.',
+  },
+  {
+    type: 'mcq',
+    question: 'Hvilken analysemetode er mest egnet for å separere og identifisere organiske komponenter i en blanding?',
+    options: ['NMR-spektroskopi', 'TLC (tynnsjiktskromatografi)', 'UV–vis absorpsjon', 'Flamfotometri'],
+    answer: 1,
+    hint: 'TLC er en enkel og rask separasjonsmetode for organisk materiale.',
+    solution: 'TLC brukes til å separere komponenter basert på polaritet. NMR gir struktur men ikke separasjon.',
+  },
+  {
+    type: 'mcq',
+    question: 'Hva er hovedproduktet når en tertiær alkohol dehydreres med syre?',
+    options: ['Eter', 'Alken', 'Alkan', 'Ketol'],
+    answer: 1,
+    hint: 'Dehydrering av alkoholer gir ofte dobbeltbinding.',
+    solution: 'Syrekatalysert eliminering av vann fra tertiær alkohol gir alken (E1‑mekanisme).',
+  },
+  {
+    type: 'numeric',
+    question: 'En reaksjon følger hastighetsloven v = k[A][B]². Hvis [A] dobles og [B] halveres, hvordan endres reaksjonshastigheten?',
+    answer: 0.5,
+    tolerance: 0.05,
+    hint: 'v₂/v₁ = (k·(2[A])·(0,5[B])²)/(k·[A]·[B]²).',
+    solution: 'v₂/v₁ = (2·(0,5)²)/(1·1²) = 2·0,25 = 0,5. Hastigheten halveres.',
+  },
+  {
+    type: 'mcq',
+    question: 'Hva er hovedårsaken til at K_sp for BaSO₄ er svært lav (1,1×10⁻¹⁰)?',
+    options: ['Sterke ion–dipol‑krefter i vann', 'Høy lattice‑energi', 'Lav hydratiseringsenergi', 'Sterk oksidasjon'],
+    answer: 1,
+    hint: 'Lav løselighet skyldes stabilt krystallgitter.',
+    solution: 'Lattice‑energien i BaSO₄ er høy, så det er energikrevende å løse opp ionene.',
+  },
+];
+
 // Combine all exam tasks and shuffle them for variety.  We don't shuffle
 // TITRATION_TASKS alone to preserve the order for demonstration, but we
 // append the general tasks randomly.
 function buildAllTasks() {
-  const combined = [...TITRATION_TASKS, ...GENERAL_TASKS];
+  const combined = [
+    ...TITRATION_TASKS,
+    ...ADDITIONAL_TITRATION_TASKS,
+    ...GENERAL_TASKS,
+    ...ADDITIONAL_GENERAL_TASKS,
+  ];
   return combined.sort(() => Math.random() - 0.5);
 }
 
