@@ -14,7 +14,7 @@ import React, { useState, useMemo, useEffect } from 'react';
  */
 
 // Monoprotic acid and base definitions.  Ka values are
-// representative at 25 °C.  Colours are used for the indicator chip
+// representative at 25 °C.  Colours are used for the indicator chip
 // next to each reagent name and do not affect the reaction itself.
 const ACIDS = {
   'HCl': { name: 'HCl', Ka: Infinity, colour: '#2E86DE' },            // strong acid
@@ -41,6 +41,79 @@ const INDICATORS = {
   'Methyl Orange': { name: 'Methyl orange', range: [3.1, 4.4], colours: ['#A93226', '#F1C40F'] },
   'Bromothymol Blue': { name: 'Bromothymol blue', range: [6.0, 7.6], colours: ['#F4D03F', '#3498DB'] }
 };
+
+// Exam tasks covering major topics in Kjemi 2.  Each task contains a question, the type of
+// answer expected (numeric or multiple‑choice), the correct answer with an optional
+// tolerance for numeric values, a hint to assist struggling students, and a
+// detailed explanation of the correct reasoning.  These tasks span acid–base
+// equilibria, redoks, solubility, organic reaction types, catalysis,
+// chromatography, biopolymers and green chemistry principles.
+const examTasks = [
+  {
+    question: 'Beregn pH i en buffer laget av 0.1 M CH₃COOH og 0.1 M CH₃COONa. Ka for CH₃COOH = 1.8×10⁻⁵.',
+    type: 'numeric',
+    answer: 4.74,
+    tolerance: 0.1,
+    hint: 'Bruk Henderson–Hasselbalch‑ligningen: pH = pKa + log([base]/[acid]).',
+    explanation: 'Siden [base] = [acid] gir brøken log(1) = 0. pKa = −log(1.8×10⁻⁵) ≈ 4.74, så pH ≈ 4.74.'
+  },
+  {
+    question: 'Hvilken type organisk reaksjon beskriver hydrogenering av en dobbeltbinding i en alkene?',
+    type: 'mcq',
+    options: ['Substitusjon', 'Eliminasjon', 'Addisjon', 'Kondensasjon'],
+    answer: 'Addisjon',
+    hint: 'Ved hydrogenering brytes en dobbeltbinding og to atomer legges til.',
+    explanation: 'Hydrogenering av en alken innebærer å addere H₂ over dobbeltbindingen; det er derfor en addisjonsreaksjon.'
+  },
+  {
+    question: 'Hva er standard cellepotensial for Daniell‑elementet (Zn|Zn²⁺||Cu²⁺|Cu)?',
+    type: 'numeric',
+    answer: 1.10,
+    tolerance: 0.05,
+    hint: 'E°_cell = E°_katode − E°_anode. Se reduksjonspotensialene for Zn²⁺/Zn (−0.76 V) og Cu²⁺/Cu (+0.34 V).',
+    explanation: 'Katoden er Cu²⁺/Cu (+0.34 V) og anoden er Zn²⁺/Zn (−0.76 V). E° = 0.34 V − (−0.76 V) = 1.10 V.'
+  },
+  {
+    question: 'Hva gjør en katalysator i en reaksjon?',
+    type: 'mcq',
+    options: ['Øker aktiveringsenergien', 'Flytter likevekten', 'Øker reaksjonshastigheten uten å forbrukes', 'Øker entalpien'],
+    answer: 'Øker reaksjonshastigheten uten å forbrukes',
+    hint: 'En katalysator endrer reaksjonsmekanismen men forbrukes ikke.',
+    explanation: 'Katalysatoren senker aktiveringsenergien og øker dermed reaksjonshastigheten uten å selv bli brukt opp.'
+  },
+  {
+    question: 'Vil det dannes bunnfall når du blander like volumer av 0,05 M BaCl₂ og 0,05 M Na₂SO₄? (Kₛₚ for BaSO₄ = 1,1×10⁻¹⁰)',
+    type: 'mcq',
+    options: ['Ja', 'Nei'],
+    answer: 'Ja',
+    hint: 'Beregn [Ba²⁺] og [SO₄²⁻] etter blanding (fortynnes til halv konsentrasjon) og sammenlikn produktet med Kₛₚ.',
+    explanation: 'Etter blanding er [Ba²⁺] = [SO₄²⁻] = 0,025 M. Ioneproduktet (0,025×0,025 = 6,25×10⁻⁴) er større enn Kₛₚ, så BaSO₄ felles ut.'
+  },
+  {
+    question: 'Hvilken komponent i papirkromatografi vandrer lengst med løsemiddelfronten?',
+    type: 'mcq',
+    options: ['Den mest polare', 'Den som binder sterkest til papiret', 'Den som er mest løselig i den mobile fasen', 'Den tyngste molekylen'],
+    answer: 'Den som er mest løselig i den mobile fasen',
+    hint: 'I kromatografi separeres stoffer etter fordeling mellom stasjonær og mobil fase.',
+    explanation: 'Komponenten med høyest løselighet i løsningsmidlet (mobil fase) og lav affinitet til papiret (stasjonær fase) vandrer lengst.'
+  },
+  {
+    question: 'Hva er monomeren i polysakkaridet cellulose?',
+    type: 'mcq',
+    options: ['Glukose', 'Fruktose', 'Galaktose', 'Sukrose'],
+    answer: 'Glukose',
+    hint: 'Cellulose består av lange kjeder av et hexose-sukker bundet med β-1,4-glykosidbindinger.',
+    explanation: 'Cellulose er bygget av β-D-glukoseenheter og er et eksempel på et polysakkarid av glukose.'
+  },
+  {
+    question: 'Hvilket prinsipp for grønn kjemi vektlegger bruk av fornybare råvarer?',
+    type: 'mcq',
+    options: ['Forebygg avfall', 'Atomøkonomi', 'Fornybare råvarer', 'Design for nedbrytning'],
+    answer: 'Fornybare råvarer',
+    hint: 'Et av de 12 prinsippene oppfordrer til å bruke biologiske eller andre fornybare ressurser.',
+    explanation: 'Prinsippet «Fornybare råstoffer» fremhever bruken av ikke-fossile, fornybare kilder i kjemisk produksjon.'
+  }
+];
 
 // Compute the pH for a given titration state.  The function
 // distinguishes four cases: strong acid/strong base, weak acid/strong
@@ -166,6 +239,18 @@ export default function TitrationGame() {
   const [indicatorKey, setIndicatorKey] = useState('Phenolphthalein');
   const indicator = INDICATORS[indicatorKey];
   const [difficulty, setDifficulty] = useState('Fri lek');
+  // Exam view state: current view (titration, exam, results)
+  const [view, setView] = useState('titration');
+  // Index of the current exam task
+  const [taskIndex, setTaskIndex] = useState(0);
+  // User's current answer (string to accommodate numeric and MCQ)
+  const [userAnswer, setUserAnswer] = useState('');
+  // Number of correct answers given
+  const [examScore, setExamScore] = useState(0);
+  // Flag to indicate exam has finished (used to determine results view)
+  const [examFinished, setExamFinished] = useState(false);
+  // Toggle display of hint for current question
+  const [showHint, setShowHint] = useState(false);
   // Derived values
   const pH = useMemo(() => computePH(acid, base, Ca, Cb, Va, Vb), [acid, base, Ca, Cb, Va, Vb]);
   // Equivalence volume (in litres).  Infinity if denominator is zero or acid or base strong-case symmetrical.
@@ -246,6 +331,11 @@ export default function TitrationGame() {
     const t = (pH - start) / (end - start);
     return interpolateColour(indicator.colours[0], indicator.colours[1], t);
   }, [indicator, pH]);
+  // A lighter version of the indicator colour for gradients.  Blend with
+  // white to create a soft highlight effect in the flask liquid.
+  const lighterIndicatorColour = useMemo(() => {
+    return interpolateColour(indicatorColour, '#FFFFFF', 0.6);
+  }, [indicatorColour]);
   // Height of burette liquid (0–1) and flask level relative to initial volume
   const buretteLevel = useMemo(() => {
     const total = equivalence !== Infinity ? equivalence * 2 : (Cb > 0 ? (Ca * Va) / Cb * 2 : 0.05);
@@ -260,202 +350,378 @@ export default function TitrationGame() {
   }, [Va, Vb, equivalence, Ca, Cb]);
   // Difficulty options for selection
   const difficulties = ['Fri lek', 'Middels', 'Avansert'];
+
+  // Begin an exam: reset all exam‑related state and navigate to exam view
+  function startExam() {
+    setView('exam');
+    setTaskIndex(0);
+    setUserAnswer('');
+    setExamScore(0);
+    setExamFinished(false);
+    setShowHint(false);
+    setMessage('Eksamen pågår...');
+  }
+
+  // Submit the current answer and advance to next question or finish the exam
+  function submitAnswer() {
+    const task = examTasks[taskIndex];
+    let correct = false;
+    if (task.type === 'numeric') {
+      const value = parseFloat(userAnswer);
+      if (!isNaN(value)) {
+        correct = Math.abs(value - task.answer) <= task.tolerance;
+      }
+    } else {
+      correct = userAnswer === task.answer;
+    }
+    if (correct) {
+      setExamScore(prev => prev + 1);
+    }
+    if (taskIndex < examTasks.length - 1) {
+      setTaskIndex(prev => prev + 1);
+      setUserAnswer('');
+      setShowHint(false);
+    } else {
+      setExamFinished(true);
+      setView('results');
+    }
+  }
+
+  // Toggle the hint display for the current question
+  function toggleHint() {
+    setShowHint(prev => !prev);
+  }
+
+  // Return to the titration simulation from exam or results view
+  function goToSimulation() {
+    setView('titration');
+    setShowHint(false);
+    setUserAnswer('');
+    setMessage('Velkommen tilbake til titrering!');
+  }
   return (
     <div className="titration-game">
-      <h1 className="title">SiU titreringsspill</h1>
-      {/* Controls panel */}
-      <div className="controls">
-        <div className="select-row">
-          <label>
-            Syre:
-            <select value={acidKey} onChange={e => setAcidKey(e.target.value)}>
-              {Object.keys(ACIDS).map(key => (
-                <option key={key} value={key}>{ACIDS[key].name}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Base:
-            <select value={baseKey} onChange={e => setBaseKey(e.target.value)}>
-              {Object.keys(BASES).map(key => (
-                <option key={key} value={key}>{BASES[key].name}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Indikator:
-            <select value={indicatorKey} onChange={e => setIndicatorKey(e.target.value)}>
-              {Object.keys(INDICATORS).map(key => (
-                <option key={key} value={key}>{INDICATORS[key].name}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Vanskelighetsgrad:
-            <select value={difficulty} onChange={e => setDifficulty(e.target.value)}>
-              {difficulties.map(level => (
-                <option key={level} value={level}>{level}</option>
-              ))}
-            </select>
-          </label>
+      {/* Dashboard header with navigation */}
+      <header className="dashboard-header">
+        <h1>SiU Lab – Kjemispill</h1>
+        <div className="nav-buttons">
+          <button onClick={goToSimulation} disabled={view === 'titration'}>Titrering</button>
+          <button onClick={startExam} disabled={view === 'exam' || view === 'results'}>Eksamen</button>
         </div>
-        <div className="input-row">
-          <label>
-            Ca (mol/L):
-            <input type="number" step="0.01" value={Ca} onChange={e => setCa(Math.max(1e-4, parseFloat(e.target.value) || 0))} />
-          </label>
-          <label>
-            Cb (mol/L):
-            <input type="number" step="0.01" value={Cb} onChange={e => setCb(Math.max(1e-4, parseFloat(e.target.value) || 0))} />
-          </label>
-          <label>
-            Va (L):
-            <input type="number" step="0.005" value={Va} onChange={e => setVa(Math.max(0.001, parseFloat(e.target.value) || 0))} />
-          </label>
-          <label>
-            Vb (L):
-            <input type="number" step="0.001" value={Vb} onChange={e => setVb(Math.max(0, parseFloat(e.target.value) || 0))} />
-          </label>
+      </header>
+      {/* Render titration simulator when not in exam/results mode */}
+      {view === 'titration' && (
+        <>
+          {/* Controls panel */}
+          <div className="controls">
+            <div className="select-row">
+              <label>
+                Syre:
+                <select value={acidKey} onChange={e => setAcidKey(e.target.value)}>
+                  {Object.keys(ACIDS).map(key => (
+                    <option key={key} value={key}>{ACIDS[key].name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Base:
+                <select value={baseKey} onChange={e => setBaseKey(e.target.value)}>
+                  {Object.keys(BASES).map(key => (
+                    <option key={key} value={key}>{BASES[key].name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Indikator:
+                <select value={indicatorKey} onChange={e => setIndicatorKey(e.target.value)}>
+                  {Object.keys(INDICATORS).map(key => (
+                    <option key={key} value={key}>{INDICATORS[key].name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Vanskelighetsgrad:
+                <select value={difficulty} onChange={e => setDifficulty(e.target.value)}>
+                  {difficulties.map(level => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="input-row">
+              <label>
+                Ca (mol/L):
+                <input type="number" step="0.01" value={Ca} onChange={e => setCa(Math.max(1e-4, parseFloat(e.target.value) || 0))} />
+              </label>
+              <label>
+                Cb (mol/L):
+                <input type="number" step="0.01" value={Cb} onChange={e => setCb(Math.max(1e-4, parseFloat(e.target.value) || 0))} />
+              </label>
+              <label>
+                Va (L):
+                <input type="number" step="0.005" value={Va} onChange={e => setVa(Math.max(0.001, parseFloat(e.target.value) || 0))} />
+              </label>
+              <label>
+                Vb (L):
+                <input type="number" step="0.001" value={Vb} onChange={e => setVb(Math.max(0, parseFloat(e.target.value) || 0))} />
+              </label>
+            </div>
+            <div className="button-row">
+              <button onClick={() => addVolume(0.0005)}>+0,5 mL</button>
+              <button onClick={() => addVolume(0.0025)}>+2,5 mL</button>
+              <button onClick={() => addVolume(0.01)}>+10 mL</button>
+              <button onClick={reset}>Tilbakestill</button>
+            </div>
+          </div>
+          {/* Laboratory illustration and graph */}
+          <div className="lab-and-graph">
+            <div className="lab-view">
+              <svg viewBox="0 0 200 300" width="200" height="300">
+                <defs>
+                  <linearGradient id="liquidGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={lighterIndicatorColour} />
+                    <stop offset="100%" stopColor={indicatorColour} />
+                  </linearGradient>
+                </defs>
+                <rect x="95" y="10" width="10" height="280" fill="#A29BFE" />
+                <rect x="120" y="20" width="20" height="200" fill="none" stroke="#2C3E50" strokeWidth="2" rx="5" />
+                <rect x="120" y={20 + (1 - buretteLevel) * 200} width="20" height={200 * buretteLevel} fill="#4AA8E5" />
+                <rect x="132" y="220" width="6" height="20" fill="#5D6D7E" />
+                {Vb > 0 && (
+                  <circle cx="130" cy="250" r="4" fill={indicatorColour} style={{ animation: 'drip 1s infinite' }} />
+                )}
+                <path d="M50 200 L80 50 L120 50 L150 200 Z" fill="#F5F9FF" stroke="#2C3E50" strokeWidth="2" />
+                <path d={`M60 ${200 - 100 * flaskLevel} L140 ${200 - 100 * flaskLevel} L130 200 L70 200 Z`} fill="url(#liquidGradient)" />
+              </svg>
+            </div>
+            <div className="graph-view">
+              <svg viewBox="0 0 300 200" width="300" height="200">
+                <line x1="40" y1="10" x2="40" y2="190" stroke="#2C3E50" strokeWidth="2" />
+                <line x1="40" y1="190" x2="290" y2="190" stroke="#2C3E50" strokeWidth="2" />
+                <text x="5" y="15" fontSize="10">pH</text>
+                <text x="270" y="210" fontSize="10">V_b (L)</text>
+                <polyline
+                  fill="none"
+                  stroke="#E67E22"
+                  strokeWidth="2"
+                  points={graphData.map(pt => {
+                    const x = 40 + (pt.x / (graphData[graphData.length - 1].x || 0.01)) * 250;
+                    const y = 190 - (Math.min(14, Math.max(0, pt.y)) / 14) * 180;
+                    return `${x},${y}`;
+                  }).join(' ')}
+                />
+                {(() => {
+                  const maxX = graphData[graphData.length - 1]?.x || 0.01;
+                  const x = 40 + (Vb / (maxX || 0.01)) * 250;
+                  const y = 190 - (Math.min(14, Math.max(0, pH)) / 14) * 180;
+                  return <circle cx={x} cy={y} r="4" fill="#9B59B6" />;
+                })()}
+              </svg>
+            </div>
+          </div>
+          {/* Information panel */}
+          <div className="info-panel">
+            <p><strong>pH:</strong> {pH.toFixed(2)}</p>
+            <p><strong>Veq:</strong> {equivalence === Infinity ? '—' : (equivalence).toFixed(3)} L</p>
+            {indicatorHint && <p className="hint">{indicatorHint}</p>}
+            <p className="message">{message}</p>
+          </div>
+        </>
+      )}
+      {/* Exam view */}
+      {view === 'exam' && (
+        <div className="exam-panel">
+          <h2>Eksamen</h2>
+          <p><strong>Oppgave {taskIndex + 1} av {examTasks.length}</strong></p>
+          <p>{examTasks[taskIndex].question}</p>
+          {examTasks[taskIndex].type === 'numeric' ? (
+            <input type="number" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} />
+          ) : (
+            examTasks[taskIndex].options.map(opt => (
+              <label key={opt} style={{ display: 'block', margin: '4px 0' }}>
+                <input type="radio" name="mcq" value={opt} checked={userAnswer === opt} onChange={e => setUserAnswer(e.target.value)} />
+                {opt}
+              </label>
+            ))
+          )}
+          <div className="exam-buttons">
+            <button onClick={toggleHint}>{showHint ? 'Skjul hint' : 'Vis hint'}</button>
+            <button onClick={submitAnswer}>{taskIndex === examTasks.length - 1 ? 'Fullfør' : 'Neste'}</button>
+          </div>
+          {showHint && <p className="hint">{examTasks[taskIndex].hint}</p>}
         </div>
-        <div className="button-row">
-          <button onClick={() => addVolume(0.0005)}>+0.5 mL</button>
-          <button onClick={() => addVolume(0.0025)}>+2.5 mL</button>
-          <button onClick={() => addVolume(0.01)}>+10 mL</button>
-          <button onClick={reset}>Tilbakestill</button>
+      )}
+      {/* Results view */}
+      {view === 'results' && (
+        <div className="results-panel">
+          <h2>Resultater</h2>
+          <p>Du svarte riktig på {examScore} av {examTasks.length} oppgaver.</p>
+          <ul>
+            {examTasks.map((task, i) => (
+              <li key={i} style={{ marginBottom: '8px' }}>
+                <strong>Oppgave {i + 1}:</strong> {task.question}<br />
+                Riktig svar: {task.answer}. {task.explanation}
+              </li>
+            ))}
+          </ul>
+          <div className="exam-buttons">
+            <button onClick={startExam}>Ta eksamen på nytt</button>
+            <button onClick={goToSimulation}>Tilbake til titrering</button>
+          </div>
         </div>
-      </div>
-      {/* Laboratory illustration and graph */}
-      <div className="lab-and-graph">
-        <div className="lab-view">
-          <svg viewBox="0 0 200 300" width="200" height="300">
-            {/* Stand */}
-            <rect x="95" y="10" width="10" height="280" fill="#6C5CE7" />
-            {/* Burette outline */}
-            <rect x="120" y="20" width="20" height="200" fill="none" stroke="#2C3E50" strokeWidth="2" rx="5" />
-            {/* Burette liquid */}
-            <rect x="120" y={20 + (1 - buretteLevel) * 200} width="20" height={200 * buretteLevel} fill="#3498DB" />
-            {/* Stopcock */}
-            <rect x="132" y="220" width="6" height="20" fill="#34495E" />
-            {/* Drip animation: show droplet when adding titrant */}
-            {Vb > 0 && (
-              <circle cx="130" cy="250" r="4" fill={indicatorColour} style={{ animation: 'drip 1s infinite' }} />
-            )}
-            {/* Erlenmeyer flask */}
-            <path d="M50 200 L80 50 L120 50 L150 200 Z" fill="#ecf0f1" stroke="#2C3E50" strokeWidth="2" />
-            {/* Flask liquid */}
-            <path d={`M60 ${200 - 100 * flaskLevel} L140 ${200 - 100 * flaskLevel} L130 200 L70 200 Z`} fill={indicatorColour} />
-          </svg>
-        </div>
-        <div className="graph-view">
-          <svg viewBox="0 0 300 200" width="300" height="200">
-            {/* Axes */}
-            <line x1="40" y1="10" x2="40" y2="190" stroke="#2C3E50" strokeWidth="2" />
-            <line x1="40" y1="190" x2="290" y2="190" stroke="#2C3E50" strokeWidth="2" />
-            {/* Axis labels */}
-            <text x="5" y="15" fontSize="10">pH</text>
-            <text x="270" y="210" fontSize="10">V_b (L)</text>
-            {/* Plot polyline */}
-            <polyline
-              fill="none"
-              stroke="#E67E22"
-              strokeWidth="2"
-              points={graphData.map(pt => {
-                const x = 40 + (pt.x / (graphData[graphData.length - 1].x || 0.01)) * 250;
-                const y = 190 - (Math.min(14, Math.max(0, pt.y)) / 14) * 180;
-                return `${x},${y}`;
-              }).join(' ')}
-            />
-            {/* Current point marker */}
-            {(() => {
-              const maxX = graphData[graphData.length - 1]?.x || 0.01;
-              const x = 40 + (Vb / (maxX || 0.01)) * 250;
-              const y = 190 - (Math.min(14, Math.max(0, pH)) / 14) * 180;
-              return <circle cx={x} cy={y} r="4" fill="#16A085" />;
-            })()}
-          </svg>
-        </div>
-      </div>
-      {/* Information panel */}
-      <div className="info-panel">
-        <p><strong>pH:</strong> {pH.toFixed(2)}</p>
-        <p><strong>Veq:</strong> {equivalence === Infinity ? '—' : (equivalence).toFixed(3)} L</p>
-        {indicatorHint && <p className="hint">{indicatorHint}</p>}
-        <p className="message">{message}</p>
-      </div>
+      )}
+      {/* Embedded styles for layout and components */}
       <style>{`
-        .titration-game { font-family: Arial, sans-serif; color: #2C3E50; background: linear-gradient(180deg, #D6EAF8, #FDFEFE); padding: 20px; border-radius: 8px; }
-        .title { text-align: center; color: #1F618D; margin-bottom: 16px; }
-        .controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-        .select-row, .input-row, .button-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
-        label { display: flex; flex-direction: column; font-size: 12px; color: #34495E; }
-        select, input { border: 1px solid #BDC3C7; border-radius: 4px; padding: 4px; min-width: 80px; }
-        button { background-color: #3498DB; color: white; border: none; border-radius: 4px; padding: 6px 10px; cursor: pointer; transition: background-color 0.2s; font-size: 12px; }
-        button:hover { background-color: #2980B9; }
-        .lab-and-graph { display: flex; gap: 16px; justify-content: center; }
-        .lab-view { background: #ECF0F1; border: 1px solid #BDC3C7; border-radius: 8px; padding: 8px; }
-        .graph-view { background: #FBFCFC; border: 1px solid #BDC3C7; border-radius: 8px; padding: 8px; }
-        .info-panel { margin-top: 16px; text-align: center; }
-        .hint { color: #7D3C98; font-size: 12px; }
-        .message { margin-top: 8px; font-weight: bold; color: #1ABC9C; }
-        @keyframes drip { 0% { opacity: 0; transform: translateY(0); } 50% { opacity: 1; transform: translateY(10px); } 100% { opacity: 0; transform: translateY(20px); } }
-          /* Design improvements - pastel colours and improved layout */
-  .titration-game {
-    background: linear-gradient(180deg, #F5F9FF 0%, #F1F5FF 100%);
-    color: #2d2d3a;
-    border-radius: 12px;
-    padding: 20px;
-  }
-  .title {
-    color: #3e3275;
-    font-size: 1.4em;
-    margin-bottom: 16px;
-  }
-  .controls {
-    flex-wrap: wrap;
-    gap: 16px;
-  }
-  .select-row,
-  .input-row,
-  .button-row {
-    gap: 16px;
-  }
-  label {
-    color: #343a6e;
-    font-size: 0.9em;
-  }
-  select,
-  input {
-    border: 1px solid #bcbcf2;
-    border-radius: 8px;
-    padding: 6px 10px;
-    font-size: 14px;
-  }
-  button {
-    background-color: #7058a5;
-    color: #fff;
-    border-radius: 8px;
-    padding: 8px 16px;
-    transition: background-color 0.2s ease;
-  }
-  button:hover {
-    background-color: #614a8f;
-  }
-  .lab-view, .graph-view, .info-panel {
-    background: #f8f6ff;
-    border-radius: 12px;
-    border: 1px solid #e0ddf7;
-  }
-  .hint {
-    color: #8050a0;
-    font-size: 12px;
-  }
-  .message {
-    color: #49406f;
-    font-size: 14px;
-    font-weight: 500;
-  }
-
-
+        /* Overall container styles */
+        .titration-game {
+          font-family: 'Segoe UI', Tahoma, sans-serif;
+          color: #34495E;
+          background: linear-gradient(180deg, #F5F9FF 0%, #FFFFFF 100%);
+          padding: 24px;
+          border-radius: 16px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        /* Dashboard header */
+        .dashboard-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: linear-gradient(90deg, #6C5CE7 0%, #0984E3 100%);
+          padding: 12px 16px;
+          border-radius: 12px;
+          color: #ffffff;
+          margin-bottom: 20px;
+        }
+        .dashboard-header h1 {
+          font-size: 20px;
+          margin: 0;
+        }
+        .nav-buttons button {
+          margin-left: 8px;
+          background: #74B9FF;
+          color: #FFFFFF;
+          border: none;
+          border-radius: 6px;
+          padding: 6px 12px;
+          cursor: pointer;
+          transition: background-color 0.2s, transform 0.1s;
+          font-size: 13px;
+        }
+        .nav-buttons button:disabled {
+          opacity: 0.6;
+          cursor: default;
+        }
+        .nav-buttons button:not(:disabled):hover {
+          background: #0984E3;
+        }
+        .nav-buttons button:active {
+          transform: scale(0.97);
+        }
+        /* Control panel layout */
+        .controls {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+        .select-row,
+        .input-row,
+        .button-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 14px;
+          justify-content: center;
+        }
+        label {
+          display: flex;
+          flex-direction: column;
+          font-size: 13px;
+          color: #2C3E50;
+        }
+        select,
+        input {
+          border: 1px solid #D0D7DE;
+          border-radius: 6px;
+          padding: 6px;
+          min-width: 90px;
+          background: #FFFFFF;
+          color: #34495E;
+          font-size: 13px;
+        }
+        button {
+          background-color: #007ACC;
+          color: #FFFFFF;
+          border: none;
+          border-radius: 6px;
+          padding: 8px 14px;
+          cursor: pointer;
+          transition: background-color 0.2s, transform 0.1s;
+          font-size: 13px;
+        }
+        button:hover {
+          background-color: #005F99;
+        }
+        button:active {
+          transform: scale(0.97);
+        }
+        /* Lab and graph containers */
+        .lab-and-graph {
+          display: flex;
+          flex-direction: row;
+          gap: 20px;
+          justify-content: center;
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+        .lab-view,
+        .graph-view {
+          background: #FFFFFF;
+          border: 1px solid #E5EAF1;
+          border-radius: 12px;
+          padding: 12px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+        .info-panel {
+          margin-top: 20px;
+          text-align: center;
+          font-size: 14px;
+        }
+        .hint {
+          color: #8E44AD;
+          font-size: 13px;
+        }
+        .message {
+          margin-top: 10px;
+          font-weight: bold;
+          color: #16A085;
+        }
+        /* Exam and results panels */
+        .exam-panel, .results-panel {
+          background: #FFFFFF;
+          border: 1px solid #E5EAF1;
+          border-radius: 12px;
+          padding: 20px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+          max-width: 640px;
+          margin: 0 auto;
+          font-size: 14px;
+        }
+        .exam-buttons {
+          margin-top: 12px;
+          display: flex;
+          gap: 12px;
+          justify-content: center;
+        }
+        .results-panel ul {
+          list-style: none;
+          padding-left: 0;
+        }
+        /* Drip animation for titrant drops */
+        @keyframes drip {
+          0%   { opacity: 0; transform: translateY(0); }
+          50%  { opacity: 1; transform: translateY(12px); }
+          100% { opacity: 0; transform: translateY(24px); }
+        }
       `}</style>
     </div>
   );
